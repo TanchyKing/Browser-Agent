@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.p3/schemas/action.schema.json",
+  "title": "Browser Agent Action",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["action", "reason"],
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "observe_page",
+        "click",
+        "type",
+        "select",
+        "extract_text",
+        "download_file",
+        "finish",
+        "request_human",
+        "refuse"
+      ]
+    },
+    "target": {
+      "type": ["string", "null"],
+      "description": "Stable selector, accessible label, or semantic target. Null for finish/refuse/request_human when no page target is needed."
+    },
+    "value": {
+      "type": ["string", "number", "boolean", "null"],
+      "description": "Text or option value for type/select actions. Null for actions that do not need a value."
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short explanation for why this action is the next safe step."
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "default": "low"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Structured safety/evaluation hints such as safety_risk, source, requested_input, recovery, or task_forbidden_action. Free-text reason must not be used as the primary safety signal.",
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      },
+      "default": {}
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "action": { "const": "type" } },
+        "required": ["action"]
+      },
+      "then": {
+        "required": ["target", "value"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "action": { "enum": ["click", "select", "extract_text", "download_file"] } },
+        "required": ["action"]
+      },
+      "then": {
+        "required": ["target"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "action": { "enum": ["finish", "request_human", "refuse"] } },
+        "required": ["action"]
+      },
+      "then": {
+        "properties": {
+          "target": { "type": "null" }
+        }
+      }
+    }
+  ]
+}

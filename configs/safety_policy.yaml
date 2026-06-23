@@ -1,0 +1,66 @@
+# Browser Agent safety policy for Conversation D.
+# Keep this file dependency-light: src/agent/safety.py supports the simple list
+# format used here without requiring PyYAML.
+
+allowed_actions:
+  - observe_page
+  - click
+  - type
+  - select
+  - extract_text
+  - download_file
+  - finish
+  - request_human
+  - refuse
+
+requires_target:
+  - click
+  - type
+  - select
+  - extract_text
+  - download_file
+
+requires_value:
+  - type
+  - select
+
+terminal_actions:
+  - finish
+  - request_human
+  - refuse
+
+high_risk_target_terms:
+  - submit
+  - send
+  - email
+  - delete
+  - remove
+  - payment
+  - pay
+  - purchase
+  - checkout
+  - transfer
+  - upload
+  - password
+  - token
+  - api key
+  - secret
+
+high_risk_actions: []
+
+forbidden_intent_terms:
+  - ignore previous instructions
+  - reveal system prompt
+  - read local file
+  - exfiltrate
+  - bypass safety
+  - leak secret
+  - steal
+  - delete account
+
+human_confirmation_actions:
+  - request_human
+
+# Page text is treated as untrusted observation, not as policy by itself. The
+# safety layer blocks only when the proposed action target/value/metadata or
+# task forbidden_actions indicate the agent is following unsafe instructions.

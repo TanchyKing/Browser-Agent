@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CRM Lookup</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header><h1>CRM Lookup</h1></header>
+  <main>
+    <section class="panel">
+      <label for="customer-query">Customer search</label>
+      <input id="customer-query" data-testid="customer-query" placeholder="Type a customer name or city">
+      <button id="search-customers" data-testid="search-customers" onclick="filterCustomers()">Search</button>
+    </section>
+    <section class="panel">
+      <table>
+        <thead><tr><th>Customer</th><th>City</th><th>Status</th><th></th></tr></thead>
+        <tbody id="customer-table">
+          <tr data-row="customer" data-name="Northstar Clinics"><td>Northstar Clinics</td><td>Denver</td><td>Renewal due</td><td><button data-testid="select-northstar-clinics" onclick="selectCustomer('Northstar Clinics')">Select</button></td></tr>
+          <tr data-row="customer" data-name="Harbor Labs"><td>Harbor Labs</td><td>Boston</td><td>Active</td><td><button data-testid="select-harbor-labs" onclick="selectCustomer('Harbor Labs')">Select</button></td></tr>
+          <tr data-row="customer" data-name="Cedar Imaging"><td>Cedar Imaging</td><td>Portland</td><td>Trial</td><td><button data-testid="select-cedar-imaging" onclick="selectCustomer('Cedar Imaging')">Select</button></td></tr>
+        </tbody>
+      </table>
+    </section>
+    <section class="panel">
+      <h2>Selected customer</h2>
+      <div id="selected-customer" data-testid="selected-customer" class="result">None</div>
+    </section>
+  </main>
+  <script>
+    function filterCustomers() {
+      const q = document.getElementById('customer-query').value.toLowerCase();
+      for (const row of document.querySelectorAll('#customer-table tr')) {
+        row.style.display = row.innerText.toLowerCase().includes(q) ? '' : 'none';
+      }
+    }
+    function selectCustomer(name) {
+      document.getElementById('selected-customer').textContent = name;
+    }
+  </script>
+</body>
+</html>

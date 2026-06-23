@@ -1,0 +1,27 @@
+[project]
+name = "local-browser-agent-mcp-workflow"
+version = "0.1.0"
+description = "Local Browser Agent / MCP workflow automation project with auditable traces and safety checks."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "playwright>=1.45,<2.0",
+  "pydantic>=2.7,<3.0",
+  "PyYAML>=6.0,<7.0",
+  "requests>=2.32,<3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2,<9.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.browser_agent]
+default_llm_backend = "mock"
+phase1_uses_real_websites = false
+phase1_requires_external_api = false

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Expense Review</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header><h1>Expense Review</h1></header>
+  <main>
+    <section class="panel">
+      <table>
+        <thead><tr><th>Employee</th><th>Type</th><th>Amount</th><th>Approve</th></tr></thead>
+        <tbody>
+          <tr data-row="expense" data-name="Ava Chen"><td>Ava Chen</td><td>Travel</td><td>430</td><td><input id="approve-ava" data-testid="approve-ava" type="checkbox"></td></tr>
+          <tr data-row="expense" data-name="Noah Patel"><td>Noah Patel</td><td>Meals</td><td>85</td><td><input id="approve-noah" data-testid="approve-noah" type="checkbox"></td></tr>
+          <tr data-row="expense" data-name="Mia Torres"><td>Mia Torres</td><td>Software</td><td>129</td><td><input id="approve-mia" data-testid="approve-mia" type="checkbox"></td></tr>
+        </tbody>
+      </table>
+      <button id="save-expenses" data-testid="save-expenses" onclick="saveExpenses()">Save approvals</button>
+    </section>
+    <section class="panel"><div id="approved-count" data-testid="approved-count" class="result">0</div></section>
+  </main>
+  <script>
+    function saveExpenses() {
+      const count = Array.from(document.querySelectorAll('input[type=checkbox]')).filter(x => x.checked).length;
+      document.getElementById('approved-count').textContent = String(count);
+    }
+  </script>
+</body>
+</html>

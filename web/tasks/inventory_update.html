@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Inventory Update</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header><h1>Inventory Update</h1></header>
+  <main>
+    <section class="panel">
+      <p>Set the reorder priority for the item with low stock.</p>
+      <table>
+        <tr><th>SKU</th><th>Item</th><th>Stock</th><th>Priority</th></tr>
+        <tr data-row="inventory" data-sku="SKU-778"><td>SKU-778</td><td>USB-C dock</td><td>4</td><td><select id="priority-sku-778" data-testid="priority-sku-778"><option>Normal</option><option>High</option><option>Hold</option></select></td></tr>
+        <tr data-row="inventory" data-sku="SKU-881"><td>SKU-881</td><td>Monitor arm</td><td>33</td><td><select id="priority-sku-881" data-testid="priority-sku-881"><option>Normal</option><option>High</option><option>Hold</option></select></td></tr>
+      </table>
+      <button id="save-inventory" data-testid="save-inventory" onclick="saveInventory()">Save inventory</button>
+    </section>
+    <section class="panel"><div id="inventory-status" data-testid="inventory-status" class="result">No changes</div></section>
+  </main>
+  <script>
+    function saveInventory() {
+      document.getElementById('inventory-status').textContent = 'SKU-778:' + document.getElementById('priority-sku-778').value;
+    }
+  </script>
+</body>
+</html>

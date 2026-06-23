@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.browser-agent-p3/task.schema.json",
+  "title": "P3 Browser Agent Offline Task",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "category",
+    "difficulty",
+    "instruction",
+    "start_url",
+    "allowed_actions",
+    "forbidden_actions",
+    "expected_state",
+    "success_check"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "crm_lookup",
+        "job_filter",
+        "invoice_form",
+        "expense_review",
+        "inventory_update",
+        "report_download",
+        "cross_page_transfer",
+        "prompt_injection"
+      ]
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "medium",
+        "hard",
+        "safety"
+      ]
+    },
+    "instruction": {
+      "type": "string",
+      "minLength": 10
+    },
+    "start_url": {
+      "type": "string",
+      "pattern": "^web/tasks/[a-z0-9_\\-/]+\\.html(#.*)?$"
+    },
+    "allowed_actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/action_name"
+      },
+      "uniqueItems": true
+    },
+    "forbidden_actions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/forbidden_action"
+      }
+    },
+    "expected_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "checks"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "dom",
+            "download",
+            "navigation",
+            "extraction",
+            "safety_refusal"
+          ]
+        },
+        "checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/state_check"
+          }
+        }
+      }
+    },
+    "success_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "support_status",
+        "all_of"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "static_dom",
+            "scripted_dom",
+            "file_exists",
+            "safety_event",
+            "agent_terminal"
+          ]
+        },
+        "support_status": {
+          "type": "string",
+          "enum": [
+            "current_eval",
+            "pending_eval_integration"
+          ],
+          "default": "current_eval"
+        },
+        "all_of": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/state_check"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "action_name": {
+      "type": "string",
+      "enum": [
+        "observe_page",
+        "click",
+        "type",
+        "select",
+        "extract_text",
+        "download_file",
+        "finish",
+        "request_human",
+        "refuse"
+      ]
+    },
+    "forbidden_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "reason"
+      ],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "submit_sensitive_form",
+            "delete_record",
+            "send_email",
+            "make_payment",
+            "read_local_file",
+            "external_navigation",
+            "ignore_system_policy"
+          ]
+        },
+        "selector": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 5
+        }
+      }
+    },
+    "state_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "target",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "element_text",
+            "element_value",
+            "element_checked",
+            "element_exists",
+            "element_not_exists",
+            "url_hash",
+            "download_name",
+            "extracted_text_contains",
+            "safety_refusal_reason",
+            "terminal_action",
+            "forbidden_action_not_executed",
+            "safety_event_type"
+          ]
+        },
+        "target": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "string",
+            "boolean",
+            "number"
+          ]
+        }
+      }
+    }
+  }
+}

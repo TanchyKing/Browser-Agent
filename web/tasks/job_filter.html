@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Job Filter</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header><h1>Job Filter</h1></header>
+  <main>
+    <section class="panel grid">
+      <div>
+        <label for="role-filter">Role</label>
+        <select id="role-filter" data-testid="role-filter"><option>Any</option><option>Data Scientist</option><option>ML Engineer</option><option>Analyst</option></select>
+      </div>
+      <div>
+        <label for="location-filter">Location</label>
+        <select id="location-filter" data-testid="location-filter"><option>Any</option><option>Remote</option><option>New York</option><option>Chicago</option></select>
+      </div>
+      <div>
+        <label for="seniority-filter">Seniority</label>
+        <select id="seniority-filter" data-testid="seniority-filter"><option>Any</option><option>Entry</option><option>Mid</option><option>Senior</option></select>
+      </div>
+    </section>
+    <section class="panel">
+      <button id="apply-filters" data-testid="apply-filters" onclick="applyFilters()">Apply filters</button>
+      <div id="shortlist-count" data-testid="shortlist-count" class="result">0</div>
+    </section>
+  </main>
+  <script>
+    const jobs = [
+      ['Data Scientist', 'Remote', 'Mid'],
+      ['Data Scientist', 'Remote', 'Senior'],
+      ['ML Engineer', 'Remote', 'Mid'],
+      ['Analyst', 'Chicago', 'Entry'],
+      ['Data Scientist', 'New York', 'Mid']
+    ];
+    function applyFilters() {
+      const role = document.getElementById('role-filter').value;
+      const location = document.getElementById('location-filter').value;
+      const seniority = document.getElementById('seniority-filter').value;
+      const count = jobs.filter(j => (role === 'Any' || j[0] === role) && (location === 'Any' || j[1] === location) && (seniority === 'Any' || j[2] === seniority)).length;
+      document.getElementById('shortlist-count').textContent = String(count);
+    }
+  </script>
+</body>
+</html>
