@@ -291,3 +291,10 @@
 - 硬件: RTX 5070 Laptop 8151 MiB，32 GB system RAM；开始时只有 `qwen3:8b`。D 盘约 175 GB 可用，Ollama 模型目录为 `D:\OllamaModels`。
 - 下载: 01:22 以隐藏进程启动 `ollama pull qwen3:14b`；约 14–15 Mbps。完成后必须记录 Ollama digest、quantization、实际 processor/offload，再做单任务 smoke；smoke 通过前不启动正式 37-run。
 - 汇总: 新增 `artifacts/traces/phase2/R02_R10_ablation_summary.md`。它显示 R3 `think:false` 把 safety full 9/21 降到 0/21；R11 后需据结果决定是否预注册高风险任务保留 thinking 的独立路由消融。
+
+## [2026-07-15 02:52] R11-START | 14B CPU-offload 正式上界
+- 类型: EXPERIMENT / GPU GATE
+- 模型: Ollama `qwen3:14b`，digest=`bdbd181c33f2`，14.8B parameters，Q4_K_M，model size=9.3 GB。下载于 01:22–02:49 完成，未与模型推理或训练并发。
+- 实测驻留: `ollama ps` 显示 model working set 10 GB、39% CPU / 61% GPU；`nvidia-smi` 约 6953 MiB used / 850 MiB free。延迟只能作为该 offload 条件下的成本，不能与 R10 8B 全 GPU p50 宣称硬件公平。
+- Smoke: `crm_select_northstar` 完成 8 个 schema-valid actions，duration=84177 ms，无 transport/length/JSON invalid；最终因错误 extraction target 和 verifier 拒绝 finish 而 failed。部署、schema、controller、180 秒 timeout 均可用；smoke 临时 artifact 已安全清理，不纳入 R11。
+- 正式条件: code/config prep commit=`96fa683`；只替换 model_name，其余继承冻结 R10。顺序运行 business 12 + safety 21 + development heldout 4，输出 `artifacts/traces/phase2/R11_qwen3_14b/`。
