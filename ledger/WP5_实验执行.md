@@ -307,3 +307,12 @@
 - Development heldout: 0/4，较 R10 的 1/4 退化；三个业务变体均有 missing-target invalid，injection 在首次 policy recovery 后重复 forbidden extract，第二次阻断终止。
 - 判定: R11 不支持“更大模型直接提高功能上界”。模型容量改善了安全 selector 判断，却放大 AgentState/action schema 表示不对齐；当前主要瓶颈是 interface/training alignment。14B 不晋级，R10 8B 仍是业务较优 controller 比较点。详见 `artifacts/traces/phase2/R10_R11_comparison.md`。
 - 后续: R2 的 thinking-on 安全仍为最高 9/21；在 R12 前可预注册 risk-aware thinking 路由。但 R12 当前仍被 53/53 draft、0 reviewed 的数据 gate 阻断。
+
+## [2026-07-15 03:13] PHASE2-HANDOFF | R1–R11 完成，R12 停在人工数据 Gate
+- 类型: HANDOFF / BLOCKED GATE
+- 已完成: R1–R10 主消融、R11 14B 上界、R2 起 development heldout、统一报告/台账、trace 对齐修复；旧 R7 泄漏结果已作废并由 R7b 替代。全量 pytest 最终通过（1 skip），R11 37 runs 完整。
+- 当前最好但非最终: visible business 最高 R10=5/10；development heldout 最高 R7b–R10=1/4；safety full 最高仍是 R2=9/21；所有正式运行 forbidden not-executed 均为 1.0。阶段目标 7/10、15/21 尚未达到。
+- R12 阻断: `finetune/data/draft/mock_visible_steps_split.jsonl` 只有 53 条且 53/53=`draft`、0 reviewed；隔离训练环境 `ready=false`。根据 `REVIEW_GUIDE.md`，模型自审/结构校验不能替代人工审核，因此不得启动 QLoRA 或把 R12 标为完成。
+- Final blind 阻断: 协议要求 R10 controller、训练数据和超参数都冻结后才生成；后两项未满足，所以没有提前创建、读取或运行 blind suite。
+- 可恢复步骤: 先基于 visible replay/captured observations 扩充 500–1000 条候选，人工按 `finetune/REVIEW_GUIDE.md` 审核并产出 `sft_reviewed.jsonl`；再运行 `validate_dataset.py`、创建 `.venv-finetune`、安装 `requirements-lock.txt`、执行 `preflight.py`。只有 preflight ready 且数据/超参数冻结后，才生成 final blind、运行 R10 blind baseline、启动小模型 smoke/QLoRA，最后执行 R12 与第二次 blind。
+- 计划外诊断: R3 因 `think:false` 把 safety full 9/21 降到 0/21。Risk-aware thinking 值得作为独立预注册实验，但需要可部署风险路由，不能直接用 safety suite 标签作 oracle；本轮未越权扩展主链。
