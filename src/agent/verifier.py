@@ -22,4 +22,9 @@ def verify_candidate(action: AgentAction, state: AgentState) -> VerificationDeci
             False,
             "finish rejected; pending observable slots: " + ", ".join(sorted(state.pending_slots)),
         )
+    if state.required_slots and not state.pending_slots and not action.is_terminal:
+        return VerificationDecision(
+            False,
+            "all observable slots are complete; return finish instead of another browser action",
+        )
     return VerificationDecision(True, "observable completion requirements allow candidate")

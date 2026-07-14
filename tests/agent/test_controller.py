@@ -56,6 +56,49 @@ class ControllerTests(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertIn("pending", decision.reason)
 
+    def test_completion_verifier_requests_finish_after_all_slots_complete(self):
+        state = AgentState.from_contract(
+            TaskContract(
+                instruction="Read report",
+                required_slots={"read": {"result_key": "extracted_text"}},
+            ),
+            step_budget=3,
+        )
+        state.completed_slots.add("read")
+
+        decision = verify_candidate(
+            AgentAction(action="extract_text", target="#report", reason="read again"),
+            state,
+        )
+
+        self.assertFalse(decision.allowed)
+        self.assertIn("return finish", decision.reason)
+
+    def test_completion_verifier_blocks_extra_browser_action_in_runner(self):
+        tools = Tools(results=[{"ok": True, "extracted_text": "report"}])
+        result = BrowserAgentRunner(
+            MockLLMAdapter(
+                [
+                    {"action": "extract_text", "target": "#report", "reason": "read"},
+                    {"action": "extract_text", "target": "#report", "reason": "read again"},
+                    {"action": "finish", "reason": "report"},
+                ]
+            ),
+            tools,
+            max_steps=3,
+            task_contract=TaskContract(
+                instruction="Read report",
+                required_slots={"read": {"result_key": "extracted_text"}},
+            ),
+            controller_enabled=True,
+            state_enabled=True,
+            completion_verifier_enabled=True,
+        ).run("Read report")
+
+        self.assertTrue(result.completed)
+        self.assertEqual(tools.executed, [("extract_text", "#report")])
+        self.assertTrue(result.steps[1].result["controller_blocked"])
+
     def test_type_slot_requires_post_action_element_value(self):
         state = AgentState.from_contract(
             TaskContract(
