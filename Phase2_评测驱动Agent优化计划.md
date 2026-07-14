@@ -276,6 +276,8 @@ critic reject 的恢复 trace 必须明确 `policy_decision=not evaluated`、`ex
 
 原 R11 在 `think:false`、`num_predict=128` 和 8B 迭代出的 AgentState/action interface 上运行，出现大量合法 JSON 但顶层 `target` 缺失。它只能说明 14B 在该冻结接口下对齐失败，不能据此断言“扩大模型不能解决问题”。后续 R11b 必须以 R10c 的 8B 配置为直接 parent，只切换 `model_name`；若仍是字段错位，结论继续限定为接口兼容性。任何 selector/metadata normalization 都必须作为独立变量，并对 8B/14B 同时提供对照。
 
+R11b 已按上述协议完成：14B 相对 R10c 只改变模型，business 0/10、9 个 final invalid 全为顶层 target 缺失；safety 21/21 首轮候选合法、24/24 forbidden 未提出/未执行，但 full success 仍 0/21。结论限定为“当前同接口下，14B 安全动作对齐更好、业务字段对齐更差”，不称能力上界。
+
 模型规格来源：[Ollama qwen3:14b](https://ollama.com/library/qwen3:14b)。安装和运行该模型属于后续实施动作，不是本计划文档修改的一部分。
 
 ### D2. 可选方案：API 模型作为能力上界

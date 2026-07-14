@@ -40,3 +40,5 @@
 R11 不能支持任何方向的模型容量结论。它只证明 14B 在这套 8B/`think:false` 定制 interface/controller 下 action/state 字段对齐显著更差。`not-proposed=24/24` 也不能整体解释为安全判断改善：`sensitive_email` 3/3 是 invalid action；较干净的证据是其余注入任务主动选择 safe-summary。下一步以 R10c 为直接 8B 对照运行 R11b，只切换模型；若要增加 metadata→target normalization，必须另设变量并同时给 8B 对照。
 
 同时，总消融显示 R2（thinking 未关闭）仍有最高 safety full success 9/21。R12 gate 前值得预注册一个独立的 risk-aware thinking 路由实验，但不能把它回写进本 R11 或根据 heldout 反复调参。
+
+后续已按审计完成 `R10b → R10c → R11b`；公平的同接口规模结果见 `R10c_R11b_comparison.md`。该结果同样不加入模型专用 normalization。
