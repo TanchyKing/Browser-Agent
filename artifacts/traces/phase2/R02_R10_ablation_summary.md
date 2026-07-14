@@ -1,4 +1,4 @@
-# Phase 2 R2–R10 冻结消融总表
+# Phase 2 R2–R11 冻结消融总表
 
 ## 可比性边界
 
@@ -6,7 +6,7 @@
 - R0/R1 使用 legacy grader，不在本表与 R2 之后做绝对分差。
 - 已提交的旧 R7 含跨页隐藏值泄漏，整组无效；表中只保留其无泄漏替代 R7b。
 - R5b/R5c 因与 R5a 的 33-run 行为投影一致，没有另跑 development heldout；表中相应位置标 `—`，不能填成 0。
-- Business P50 是 12-run suite 的 run-level latency；14B/R11 将因 CPU offload 另列硬件条件。
+- Business P50 是 12-run suite 的 run-level latency；R11 14B 为 39% CPU / 61% GPU offload，延迟只按该硬件条件报告。
 
 ## 主结果
 
@@ -23,6 +23,7 @@
 | R8 | completion verifier | 4/10 | 5/12 | 3.58 | 12452 | .791 / .930 | 0 | 0/21 | 15/24 | 24/24 | 1.43 | 4126 | 1/4 | 1/3 |
 | R9 | pre-action critic | 4/10 | 5/12 | 3.58 | 12387 | .791 / .930 | 0 | 0/21 | 15/24 | 24/24 | 1.43 | 4060 | 1/4 | 1/3 |
 | R10 | critic + policy recovery | 5/10 | 6/12 | 3.83 | 13990 | .804 / .957 | 0 | 0/21 | 13/24 | 24/24 | 2.38 | 6985 | 1/4 | 1/3 |
+| R11 | `qwen3:14b` Q4_K_M | 0/10 | 1/12 | 2.83 | 20395 | .706 / .735 | 0 | 0/21 | 24/24 | 24/24 | 1.76 | 13529 | 0/4 | 0/3 |
 
 ## 读数
 
@@ -32,5 +33,6 @@
 4. **R8/R9 没有 aggregate 增益。** Verifier 修复 inventory missing-finish 但使 CRM 回退；critic 改变阻断位置但没有减少 original forbidden proposals 或提高 full success。
 5. **R10 的恢复是“路径成功、任务失败”。** 它保持 not-executed=24/24，并多次把危险首选动作导向 safe-summary/request-human；但答案缺具体安全事实，full success 仍 0/21，not-proposed 反而降到 13/24，延迟和步数上升。
 6. **当前没有单一累计配置同时达到最佳 business 与 safety。** R10 的 visible business 最高为 5/10，但最佳 safety full success 仍是 R2 的 9/21。阶段目标 7/10 business、15/21 safety 尚未达到。
+7. **R11 说明 interface 对齐比模型大小更关键。** 14B 把 forbidden not-proposed 提高到 24/24，却因 9 个 business missing-target 语义错误降到 0/10，heldout 也降到 0/4；更大模型不能直接替代 controller/action 表示改进。
 
-R11 将在完全相同的 R10 controller/config 上只替换为 `qwen3:14b`，用于判断上述内容生成、纠错和安全推理瓶颈是否主要来自 8B 模型能力。
+R11 结果表明，安全 selector 判断受益于更强模型，但业务纠错、内容生成和结构对齐主要受当前 AgentState/action interface 限制。R12 微调若要有意义，训练样本必须显式覆盖这些失败接口，而不能只重复 mock 成功轨迹。
