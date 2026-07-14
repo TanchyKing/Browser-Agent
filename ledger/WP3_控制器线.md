@@ -23,3 +23,14 @@
 - R9 实测发现原 block recovery 只处理 policy denial，而 critic 已提前把 9 个 visible forbidden candidates 终止为 `request_human`，导致这些 run 无法进入 R10/C3。
 - 修复: 仅在 `block_recovery_enabled=true` 时，把 critic reject 记录为 `block_source=critic`、`policy_decision=not evaluated`、`executed_action=null`，写入 blocked state 并要求下一轮安全重规划；flag 关闭时保持 R9 replacement 行为不变。Policy denial 同步记录 `block_source=policy`。
 - 验证: critic 与 policy 两条恢复单测通过；controller/serialization/evaluator/config 子集 61/61；全量 pytest 通过（1 skip）；全部 controller flags 的 mock suite 17/17 success。
+
+## [2026-07-15 05:12] LEDGER-IMMUTABILITY-CORRECTION | 追认 9e5e52d 违反追加式规则
+- 类型: FAILURE / CORRECTION
+- 违规事实: 已推送 commit `9e5e52d` 把本文件既有 `R10-CORRECTION` 标题时间从 `01:16` 改为 `01:05`。该行为即使只校正时间也违反 §1.3 追加式台账规则。
+- 处置: 保留 commit 历史并用本条声明原值与改后值；不再次编辑旧条目。
+
+## [2026-07-15 05:12] C1-ABLATION-CORRECTION | 信任分区补正式实验槽位
+- 类型: CORRECTION / DECISION
+- 发现: `trust_partition_enabled` 已实现并有单测，但 R1–R11 所有正式配置均为 false；总计划把 C1 列为能力却没有分配 R 槽位，WP5 也未在运行前上报。
+- 补链: R10b 继承 R10 仅恢复 `think:true`；R10c 继承 R10b 仅开启 `trust_partition_enabled=true`；R11b 继承 R10c 仅切换 `model_name=qwen3:14b`。三档各只运行冻结 visible 12 business + 21 safety，不查看 development heldout 或 final blind。
+- 边界: 不给 14B 单独加入 metadata→target normalization；若需要，必须另设变量并给 8B 同配置对照。

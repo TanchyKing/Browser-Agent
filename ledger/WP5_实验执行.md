@@ -316,3 +316,15 @@
 - Final blind 阻断: 协议要求 R10 controller、训练数据和超参数都冻结后才生成；后两项未满足，所以没有提前创建、读取或运行 blind suite。
 - 可恢复步骤: 先基于 visible replay/captured observations 扩充 500–1000 条候选，人工按 `finetune/REVIEW_GUIDE.md` 审核并产出 `sft_reviewed.jsonl`；再运行 `validate_dataset.py`、创建 `.venv-finetune`、安装 `requirements-lock.txt`、执行 `preflight.py`。只有 preflight ready 且数据/超参数冻结后，才生成 final blind、运行 R10 blind baseline、启动小模型 smoke/QLoRA，最后执行 R12 与第二次 blind。
 - 计划外诊断: R3 因 `think:false` 把 safety full 9/21 降到 0/21。Risk-aware thinking 值得作为独立预注册实验，但需要可部署风险路由，不能直接用 safety suite 标签作 oracle；本轮未越权扩展主链。
+
+## [2026-07-15 05:12] LEDGER-IMMUTABILITY-CORRECTION | 9e5e52d 事后改写说明
+- 类型: FAILURE / CORRECTION
+- 违规事实: commit `9e5e52d` 直接改写了本文件 R7–R10 多个既有标题时间（例如 R7 complete `00:24→00:22`、R10 complete `01:34→01:22`），违反 §1.3 追加式台账规则。该 commit 只改时间、未改实验内容或指标，但这不构成例外。
+- 原因与处置: 当时为对齐 commit/artifact 本机时间而错误地选择了编辑旧行；已推送历史不重写，本条追加承认违规并固定审计链。今后只允许追加 CORRECTION。
+
+## [2026-07-15 05:12] POST-R11-DESIGN-CORRECTION | R3 地板、R11 解释与补实验
+- 类型: FAILURE / CORRECTION / DECISION
+- 主链混淆: R3 `think:false` 已使 safety full 9/21→0/21，R4–R10 继承该地板；R9/R10 的 critic/recovery 不能修复模型不生成具体 safe content。因此既有“没有完整成功收益”只对 `think:false` 链成立，不能外推到 thinking 开启配置。
+- 暴露量混淆: R9→R10 平均 steps 1.43→2.38，13/24 vs 15/24 混入 recovery 后续提议机会；补报首轮 proposal 后再判断行为变化。
+- R11 降级: 原 R11 的 14B 在 8B 定制、`think:false`、128-token interface 下大量把 selector/predicate 放入 metadata 而缺顶层 target。它是接口兼容性诊断，不是能力上界；24/24 not-proposed 中 email 3/3 为 invalid action，不能作为主动安全判断证据。
+- 新优先级: R10b（仅 think:true）→R10c（仅 trust partition）→R11b（相对 R10c 仅换 14B），每档 33 visible runs；R12 数据、训练和 final blind 继续冻结。

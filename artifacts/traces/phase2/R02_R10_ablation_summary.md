@@ -1,4 +1,6 @@
-# Phase 2 R2–R11 冻结消融总表
+# Phase 2 R2–R11 历史消融总表（审计修订）
+
+> 2026-07-15 审计修订：R4–R10 全部继承 R3 的 `think:false`，而 R3 已把 safety full success 从 9/21 压到 0/21。因此这段主链不能用于否定 critic/recovery 在 thinking 开启时的效果。原 R11 也只证明 14B 在 8B/`think:false` 定制接口下发生字段对齐失败，不是有效的能力上界。补实验为 R10b→R10c→R11b。
 
 ## 可比性边界
 
@@ -30,9 +32,9 @@
 1. **最大安全退化发生在 R3，而不是 controller。** `think:false` 把 business p50 从 107346 ms 降到 25955 ms，truncation 从 .231 降到 0，但 safety full success 从 9/21 降到 0/21、not-proposed 从 18/24 降到 15/24。后续 R4–R10 从未恢复完整安全成功。全局关闭 thinking 不能作为最终安全配置；R11 后应单独预注册“高风险/安全任务保留 thinking”的路由消融。
 2. **R4 解决结构，不解决安全语义。** Bounded schema 把 JSON 提升到 1/1，并把 business 从 1/10 提到 2/10；安全仍为 0/21。
 3. **R7b 是最明确的业务 controller 收益。** 无泄漏 AgentState 把 business 2/10 提到 4/10、平均 steps 5.25 降到 3.50，并首次得到 heldout 1/4；代价是 JSON first-valid 降到 .738。
-4. **R8/R9 没有 aggregate 增益。** Verifier 修复 inventory missing-finish 但使 CRM 回退；critic 改变阻断位置但没有减少 original forbidden proposals 或提高 full success。
-5. **R10 的恢复是“路径成功、任务失败”。** 它保持 not-executed=24/24，并多次把危险首选动作导向 safe-summary/request-human；但答案缺具体安全事实，full success 仍 0/21，not-proposed 反而降到 13/24，延迟和步数上升。
+4. **R8/R9 在 `think:false` 链上没有 aggregate 增益。** Verifier 修复 inventory missing-finish 但使 CRM 回退；critic 改变阻断位置。由于 safe-content 已处于地板，不能据此推断 critic 在 thinking 开启时也无 full-success 收益。
+5. **R10 只证明 recovery 路径可执行且不越权。** 它保持 not-executed=24/24，并多次把危险首选动作导向 safe-summary/request-human；full success 仍 0/21 主要受 `think:false` 下 safe-content 缺失限制。13/24 与 R9 的 15/24 还混入了 episode 变长后的额外提议机会，须结合首轮 proposal 再比较。
 6. **当前没有单一累计配置同时达到最佳 business 与 safety。** R10 的 visible business 最高为 5/10，但最佳 safety full success 仍是 R2 的 9/21。阶段目标 7/10 business、15/21 safety 尚未达到。
-7. **R11 说明 interface 对齐比模型大小更关键。** 14B 把 forbidden not-proposed 提高到 24/24，却因 9 个 business missing-target 语义错误降到 0/10，heldout 也降到 0/4；更大模型不能直接替代 controller/action 表示改进。
+7. **R11 是接口兼容性诊断，不是能力上界。** 14B 在同一 `think:false`、128-token、8B 定制 controller 下出现 9 个 business missing-target 语义错误。24/24 not-proposed 还包含 email 的 3 个 invalid-first-action 假阳性；干净证据仅限其余注入任务主动选择 safe-summary。不能据此下模型规模结论。
 
-R11 结果表明，安全 selector 判断受益于更强模型，但业务纠错、内容生成和结构对齐主要受当前 AgentState/action interface 限制。R12 微调若要有意义，训练样本必须显式覆盖这些失败接口，而不能只重复 mock 成功轨迹。
+R12 前必须先完成 R10b（thinking 解耦）、R10c（C1 正式槽位）和 R11b（与 R10c 只差模型）。训练样本应来自最终选定 controller 的轨迹，并覆盖 target/value 顶层字段、state predicate 区分和具体安全摘要，而不能继续沿用已知安全塌方配置采集。

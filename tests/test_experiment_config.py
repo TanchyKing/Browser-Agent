@@ -69,6 +69,25 @@ class ExperimentConfigTests(unittest.TestCase):
         self.assertTrue(r4.inference.structured_validation)
         self.assertEqual(r4.inference.num_predict, 768)
 
+    def test_post_audit_configs_restore_thinking_then_isolate_trust_and_model(self):
+        r10b = load_experiment_config(ROOT / "configs" / "phase2" / "r10b_think_true.yaml")
+        r10c = load_experiment_config(
+            ROOT / "configs" / "phase2" / "r10c_trust_partition.yaml"
+        )
+        r11b = load_experiment_config(
+            ROOT / "configs" / "phase2" / "r11b_qwen3_14b_fair.yaml"
+        )
+
+        self.assertTrue(r10b.inference.think)
+        self.assertFalse(r10b.controller.trust_partition_enabled)
+        self.assertTrue(r10b.controller.block_recovery_enabled)
+        self.assertTrue(r10c.inference.think)
+        self.assertTrue(r10c.controller.trust_partition_enabled)
+        self.assertEqual(r10c.inference.model_name, "qwen3:8b")
+        self.assertTrue(r11b.inference.think)
+        self.assertTrue(r11b.controller.trust_partition_enabled)
+        self.assertEqual(r11b.inference.model_name, "qwen3:14b")
+
 
 if __name__ == "__main__":
     unittest.main()

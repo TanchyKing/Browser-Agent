@@ -1,6 +1,6 @@
 # P3 Phase 2：评测驱动的 Browser Agent 优化计划
 
-> 修订说明（2026-07-14）：根据对 artifacts、任务定义和源代码的独立复核，补充了原始响应/截断日志、`num_predict` 单变量消融，以及明确的强模型基线与延迟口径。同日第二次修订：将 R11 强模型上界并入里程碑 M4，并在 §11 开头新增依赖关系与可并行工作说明。第三次修订：区分开发 held-out 与最终封存测试，修正重复动作完成逻辑，并补充候选动作审计、固定 suite manifest 和可重建训练 trace 要求。第四次修订（2026-07-15）：根据 R9 实测，明确 R10 的 block recovery 同时覆盖 critic reject 与 policy block，避免 critic 的终端 replacement 提前截断恢复路径。
+> 修订说明（2026-07-14）：根据对 artifacts、任务定义和源代码的独立复核，补充了原始响应/截断日志、`num_predict` 单变量消融，以及明确的强模型基线与延迟口径。同日第二次修订：将 R11 强模型上界并入里程碑 M4，并在 §11 开头新增依赖关系与可并行工作说明。第三次修订：区分开发 held-out 与最终封存测试，修正重复动作完成逻辑，并补充候选动作审计、固定 suite manifest 和可重建训练 trace 要求。第四次修订（2026-07-15）：根据 R9 实测，明确 R10 的 block recovery 同时覆盖 critic reject 与 policy block，避免 critic 的终端 replacement 提前截断恢复路径。第五次修订（2026-07-15）：根据 R2–R11 事后审计，补充 R10b thinking 解耦、R10c 信任分区和 R11b 同接口规模对照；原 R11 降级为接口兼容性诊断，不再称为能力上界。
 
 ## 1. Phase 2 定位
 
@@ -264,15 +264,17 @@ critic reject 的恢复 trace 必须明确 `policy_decision=not evaluated`、`ex
 
 ## 7. 工作流 D：模型横向基线
 
-微调前增加一个明确的能力上界，用于回答：失败主要来自 Agent 架构，还是来自 `qwen3:8b` 的模型能力上限。
+微调前增加模型横向对照，用于区分模型规模、推理模式和 Agent 接口兼容性。只有模型已适配同一 action contract、且对照变量清楚时，才能讨论能力上界；不能把接口字段错位直接解释为模型容量不足或容量无效。
 
-### D1. 主方案：本地 `qwen3:14b` 功能上界
+### D1. 主方案：本地 `qwen3:14b` 同接口规模对照
 
 - 固定比较模型为 Ollama `qwen3:14b` Q4_K_M；官方模型包约 9.3 GB，超过本机 8 GB VRAM，因此预期会发生部分 CPU offload；
 - 只在 A–C 稳定后运行 12-run business + 7×3 safety，共 33 个真实模型 run；
 - 使用与 `qwen3:8b` 完全相同的 prompt、schema、controller、step budget 和 grader；
 - task success、JSON 稳定性和安全指标可作功能对比；
 - 延迟不能与全 GPU 驻留的 8B 结果直接合并或宣称公平胜负，应单列模型大小、offload、峰值 VRAM、系统 RAM 和 P50/P95 延迟。
+
+原 R11 在 `think:false`、`num_predict=128` 和 8B 迭代出的 AgentState/action interface 上运行，出现大量合法 JSON 但顶层 `target` 缺失。它只能说明 14B 在该冻结接口下对齐失败，不能据此断言“扩大模型不能解决问题”。后续 R11b 必须以 R10c 的 8B 配置为直接 parent，只切换 `model_name`；若仍是字段错位，结论继续限定为接口兼容性。任何 selector/metadata normalization 都必须作为独立变量，并对 8B/14B 同时提供对照。
 
 模型规格来源：[Ollama qwen3:14b](https://ollama.com/library/qwen3:14b)。安装和运行该模型属于后续实施动作，不是本计划文档修改的一部分。
 
@@ -383,10 +385,13 @@ critic reject 的恢复 trace 必须明确 `policy_decision=not evaluated`、`ex
 | R8 | R7 + completion verifier | 判断 missing/premature finish 是否改善 |
 | R9 | R8 + pre-action critic | 判断 forbidden proposal 是否下降 |
 | R10 | R9 + block recovery | 判断能否安全完成被注入任务 |
-| R11 | R10 controller + `qwen3:14b` 或预先冻结的 API 模型 | 建立更强模型功能上界 |
-| R12 | R10 + LoRA/QLoRA | 判断微调是否带来额外收益 |
+| R10b | R10 + `think:true` | 解耦 R3 安全塌方，重新判断 critic/recovery 在 thinking 开启时的收益 |
+| R10c | R10b + trust partition | 给 C1 正式消融槽位，判断输入信任标注是否降低危险首轮提议 |
+| R11 | R10 + `qwen3:14b`（已完成的历史诊断） | 只记录 14B 在 8B/`think:false` 定制接口下的兼容性，不作能力上界结论 |
+| R11b | R10c + `qwen3:14b` | 与 R10c 形成只改变模型的同接口规模对照 |
+| R12 | R10b/R10c 中预先选定并冻结的 controller + LoRA/QLoRA | 判断微调是否带来额外收益 |
 
-R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使用同一套修正后 grader、任务、repeat 规则，并一次只增加一个主要变量。R5 是同一个 `num_predict` 变量的三档取值。R0/R1 与 R2 之后的结果必须分栏展示，不能直接把不同 grader 下的绝对分数相减。
+R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使用同一套修正后 grader、任务、repeat 规则，并一次只增加一个主要变量。R5 是同一个 `num_predict` 变量的三档取值。R0/R1 与 R2 之后的结果必须分栏展示，不能直接把不同 grader 下的绝对分数相减。R4–R10 的 safety full success 继承 R3 `think:false` 地板，只能描述该配置链，不能据此否定 critic/recovery 在 thinking 开启时的效果；R10b 是必须先于 R12 完成的解耦实验。
 
 ## 10. Phase 2 指标与验收目标
 
@@ -425,7 +430,7 @@ R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使
 
 ### 依赖关系与可并行工作
 
-主消融链 R1→R10 必须按矩阵顺序执行：每个实验以上一配置为条件。R11 强模型上界与 R12 微调模型是从冻结的 R10 controller 分出的两条独立比较支线，逻辑上互不依赖，但本机只有一块 8GB GPU，因此评测推理、`qwen3:14b` offload 和 QLoRA 训练仍需串行调度。工程实现只有在独立 git worktree 中才允许并行；共享同一目录/HEAD 的会话必须串行。可并行的是隔离 worktree 中的工程实现、任务/数据编写和人工审核，而不是 GPU 工作负载本身。
+主消融链 R1→R10 已按矩阵执行；事后审计新增的 R10b→R10c 必须在 R12 数据定稿前串行完成。R11 是已完成但有接口混淆的历史诊断；R11b 只从 R10c 切换模型，形成规模对照。R12 使用哪一个 controller 必须在 visible 结果后一次性选定并冻结，不能根据 blind 结果返工。本机只有一块 8GB GPU，因此评测推理、`qwen3:14b` offload 和 QLoRA 训练仍需串行调度。工程实现只有在独立 git worktree 中才允许并行；共享同一目录/HEAD 的会话必须串行。
 
 可并行的四条工作线：
 
@@ -436,7 +441,7 @@ R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使
 
 后台任务：`qwen3:14b` 模型包（约 9.3 GB）可提前下载；dashboard 与报告脚本改造可随时进行。
 
-不可打破的硬依赖：R2 冻结前不得开始任何能力消融；R11（强模型上界）和 R12（微调模型）都需要 R10 controller 冻结，但二者互不依赖；R12 的最终训练数据依赖 B1 定型后的 `AgentState` 轨迹格式；所有 R-run 依赖预先冻结的 suite manifest、统一配置入口和 artifact 内配置快照。
+不可打破的硬依赖：R2 冻结前不得开始任何能力消融；R10b 必须先解耦 thinking，R10c 再单独开启 C1，R11b 才能只切换模型；R12 的最终训练数据必须基于 R10b/R10c 结果选定的 controller 轨迹，且依赖 B1 定型后的 `AgentState` 格式；所有 R-run 依赖预先冻结的 suite manifest、统一配置入口和 artifact 内配置快照。最终 blind 仍等 controller、训练数据和超参数全部冻结后才生成。
 
 ### M0：冻结基线和评测协议
 
@@ -472,10 +477,12 @@ R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使
 - policy block recovery；
 - 加强 safety answer/content check；
 - 重跑 expanded safety。
+- 审计补实验：先运行 R10b（仅 `think:true`），再运行 R10c（仅 `trust_partition_enabled=true`）；同时报告全 episode 与首轮 forbidden proposal，避免 recovery 暴露量混淆。
 
-### M4：强模型上界与微调实验
+### M4：模型横向对照与微调实验
 
-- 在冻结的 R10 controller 上运行 R11：`qwen3:14b`（CPU offload，条件单列）或预先冻结的 API 模型，判断剩余失败来自架构还是 `qwen3:8b` 能力上限；
+- 保留原 R11 作为 14B 在 R10/`think:false` 接口下的兼容性诊断，不作能力上界推论；
+- 以 R10c 为 8B 对照运行 R11b，只切换为 `qwen3:14b`（CPU offload 条件单列）；
 - 从 trace 生成候选数据；
 - 人工审核和纠错；
 - 页面/措辞/selector 变体；

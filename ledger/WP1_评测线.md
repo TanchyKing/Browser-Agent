@@ -20,3 +20,15 @@
 - 修复: browser/run step 合并必须同时匹配 action type 与 selector，并保证每条 browser step 只消费一次；索引仅作为优先候选，动作不匹配时搜索后续 runner step。新增 critic-block gap 回归测试。
 - 验证: eval 子集 32/32、全量 pytest 通过（1 skip）；同一批 R10 traces 重算 not-executed=24/24。用新 evaluator 回放 R8/R9 的 business/safety/heldout 六份 artifact，summary、success checks、safety outcomes 与已提交结果逐字一致，无历史分数漂移。
 - 下一步: 正式实验执行者必须先完成并冻结 R1，再运行 R2；R2 完成前不得启动 R3 能力消融。工程线可继续 WP3 的 feature-flag controller 实现与 mock 验证。
+
+## [2026-07-15 05:12] LEDGER-IMMUTABILITY-CORRECTION | 追认 9e5e52d 违反追加式规则
+- 类型: FAILURE / CORRECTION
+- 违规事实: 已推送 commit `9e5e52d` 把本文件既有 `TRACE-ALIGNMENT-CORRECTION` 标题时间从 `01:25` 改为 `01:17`。内容虽未改变，但直接改写已有条目违反落地计划 §1.3“写错只追加 CORRECTION”的规则。
+- 处置: 不再改写或回滚该已发布历史；本条永久记录原值、改后值、原因和 commit。此后时间偏差只能追加更正，不允许编辑旧标题。
+
+## [2026-07-15 05:12] PRE-R12-EVAL-AUDIT | 历史回放与首轮安全口径
+- 类型: FAILURE / VERIFY / IMPL
+- 回放: 首次命令错误地把 development heldout 强制指向 `tasks/offline_tasks.jsonl`，因此 7 份 heldout summary 如预期不一致；修正为读取每份 artifact 的 `experiment.values.evaluator.task_file_path` 后，R2–R7b 共 25 份 business/safety/heldout summary 的旧 `summary/error_analysis/success_checks/safety_outcomes` 字段全部逐字段一致。
+- 影响论证: R2–R7b 没有 recovery 产生的“runner 有记录、browser 无工具调用”间隙；只读回放进一步确认 trace-alignment fix 不改变这些历史分数。原先只明确回放 R8/R9 的审计链现已补齐。
+- 指标事实: 既有 R2–R11 `safety_summary.json` 已有顶层 `safety_outcomes`，并非缺失；本次新增显式 proposal/execution 分子分母、首轮 proposal rate，以及 first-round invalid/missing candidate runs，避免把 recovery 增加的后续暴露和 invalid action 假阳性混在一起。
+- 验证: `tests/eval/test_runner.py` 13/13 通过；新增测试证明“首轮 safe、第二轮 forbidden”在全 episode 计 proposed、首轮不计 proposed。

@@ -1,4 +1,6 @@
-# R10 8B → R11 14B 强模型对照
+# R10 8B → R11 14B 接口兼容性诊断（审计修订）
+
+> 本实验保持接口相同，但接口和推理参数本身是按 8B 主链选出的，且 `think:false` 已造成 safety content 地板。因此 R11 不是公平的“能力上界”；它只描述 14B 在该冻结接口下的行为。
 
 ## 条件
 
@@ -35,6 +37,6 @@
 
 ## 结论
 
-R11 不能作为“14B 功能上界更高”的证据。它证明模型容量不是当前主要限制：在相同 interface/controller 下，14B 的安全 selector 判断更好，但 action/state 表示对齐显著更差，业务和泛化全面退化。下一步不应直接以 14B 取代 8B；微调数据必须重点覆盖顶层 target/value 与 AgentState predicate 的区分，并保留 14B 的安全不提议行为作为教师/对照信号。
+R11 不能支持任何方向的模型容量结论。它只证明 14B 在这套 8B/`think:false` 定制 interface/controller 下 action/state 字段对齐显著更差。`not-proposed=24/24` 也不能整体解释为安全判断改善：`sensitive_email` 3/3 是 invalid action；较干净的证据是其余注入任务主动选择 safe-summary。下一步以 R10c 为直接 8B 对照运行 R11b，只切换模型；若要增加 metadata→target normalization，必须另设变量并同时给 8B 对照。
 
 同时，总消融显示 R2（thinking 未关闭）仍有最高 safety full success 9/21。R12 gate 前值得预注册一个独立的 risk-aware thinking 路由实验，但不能把它回写进本 R11 或根据 heldout 反复调参。

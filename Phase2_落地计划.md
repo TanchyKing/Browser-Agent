@@ -2,7 +2,7 @@
 
 > 本文是 `Phase2_评测驱动Agent优化计划.md`（下称"总计划"）的执行版，供多个 Codex 会话并行认领工作。
 > 逐 run 证据见 `完整测试逐步复盘.md`（下称"复盘"）。本文不重复其内容，只规定"谁做什么、按什么顺序、如何验证、何时停"。
-> 复核修订（2026-07-14）：补充单 worktree 执行限制、固定 12-run manifest、统一配置入口、训练 trace、critic 候选审计和最终 blind holdout；修正重复动作完成逻辑与 WP 间硬依赖。R9 后修订（2026-07-15）：R10 的 recovery 统一覆盖 critic reject 与 policy block，关闭开关时保持 R9 行为可复现。
+> 复核修订（2026-07-14）：补充单 worktree 执行限制、固定 12-run manifest、统一配置入口、训练 trace、critic 候选审计和最终 blind holdout；修正重复动作完成逻辑与 WP 间硬依赖。R9 后修订（2026-07-15）：R10 的 recovery 统一覆盖 critic reject 与 policy block，关闭开关时保持 R9 行为可复现。R11 后审计修订（2026-07-15）：新增 R10b thinking 解耦、R10c C1 正式槽位和 R11b 同接口规模对照；原 R11 不再称能力上界。
 
 ---
 
@@ -188,9 +188,10 @@ R1 legacy replay 要求"除 A0 日志外一切与 Phase 1 相同"。因此：
 | G3 | **R3** think:false → **R4** +bounded schema → **R5** num_predict 128/256/768 三档 | 每档都是完整 33 run；R5 选定默认值后写 `DECISION` |
 | G4 | **R6** +selector enum → **R7** +AgentState → **R8** +completion verifier | 每步只开一个新 flag |
 | G5 | **R9** +pre-action critic → **R10** +block recovery | 安全指标三层全报（not_proposed / not_executed / full_success）；not_executed 必须保持 1.0 |
-| G6 | **R11** 强模型上界；另行完成训练后执行 **R12** 微调模型评测 | 两者都基于冻结 R10 controller、逻辑互不依赖；为调度方便可先 R11。R12 是训练完成后的评测编号，不把训练过程本身伪装成 run |
+| G5b | **R10b** R10 + `think:true` → **R10c** +trust partition | 两档各跑 visible 12+21；补报首轮 proposal 与 invalid-first-action，先解耦 R3 地板，再测 C1 |
+| G6 | **R11b** R10c + `qwen3:14b`；另行完成训练后执行 **R12** 微调模型评测 | R11b 与 R10c 只差 model；原 R11 仅作接口诊断。R12 使用 visible 结果后预先冻结的 controller |
 
-R3–R10 才适用“一次只增加一个能力变量”；R2 是新的测量/提示协议基线。每个 Gate 后 development held-out suite 从 R2 起运行并反馈。最终 blind holdout 只在 R10 与 R12 的预注册比较点各运行一次，结果出来后不得再调 controller、grader、超参数或训练集。
+R3–R10c 适用“一次只增加一个能力变量”；R2 是新的测量/提示协议基线。R10b/R10c/R11b 只运行冻结 visible business/safety 的 33 runs，不再根据 development held-out 调参。最终 blind holdout 尚未生成；待 R10b/R10c 选定 controller、训练数据和超参数全部冻结后，才在冻结 base 与 R12 比较点运行，结果出来后不得再调 controller、grader、超参数或训练集。
 
 ## 7. 台账条目模板
 
@@ -215,7 +216,7 @@ RUN 条目（WP5）额外要求：完整开关快照、run artifact 路径、指
 
 > **WP5 专用**：
 >
-> 你负责 WP5 实验执行。确认 §6 前置完成后，严格执行 R1→R10 主链；R11/R12 是从 R10 分出的独立支线，GPU 上串行调度。所有命令必须显式传 `--config` 和 `--suite-manifest`；每个 run 前登记快照，跑后汇总并写正式记录；`forbidden_action_not_executed_rate` 低于 1.0 立即停止。
+> 你负责 WP5 实验执行。确认 §6 前置完成后，严格执行 R1→R10 主链及审计补链 R10b→R10c→R11b；R12 继续受人工数据 gate 约束，GPU 上串行调度。所有命令必须显式传 `--config` 和 `--suite-manifest`；每个 run 前登记快照，跑后汇总并写正式记录；`forbidden_action_not_executed_rate` 低于 1.0 立即停止。
 
 ---
 
