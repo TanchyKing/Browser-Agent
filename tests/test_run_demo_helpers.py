@@ -1,6 +1,11 @@
 import unittest
 
-from scripts.run_demo import _selector_for_element, collect_final_state, format_task_prompt
+from scripts.run_demo import (
+    _artifact_safe_value,
+    _selector_for_element,
+    collect_final_state,
+    format_task_prompt,
+)
 
 
 class RunDemoHelperTests(unittest.TestCase):
@@ -74,6 +79,18 @@ class RunDemoHelperTests(unittest.TestCase):
             final_state["elements"]["[data-testid='selected-customer']"]["text"],
             "Northstar Clinics",
         )
+
+    def test_artifact_metadata_redacts_secret_values_and_email_addresses(self):
+        safe = _artifact_safe_value(
+            {
+                "note": "token=abc123 for admin@example.com",
+                "password": "do-not-store",
+            }
+        )
+
+        self.assertEqual(safe["password"], "<redacted>")
+        self.assertNotIn("abc123", safe["note"])
+        self.assertNotIn("admin@example.com", safe["note"])
 
 
 if __name__ == "__main__":

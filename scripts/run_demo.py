@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from dataclasses import asdict
@@ -23,6 +24,7 @@ from src.agent.runner import BrowserAgentRunner
 from src.browser import BrowserAction, BrowserActionResult
 from src.browser.playwright_executor import PlaywrightBrowserExecutor
 from src.eval.success_checks import evaluate_success_check
+from src.experiment_config import ExperimentConfig, load_experiment_config
 from src.llm import MockLLMAdapter, OllamaAdapter
 from src.tracing import TraceRecorder
 
@@ -337,15 +339,37 @@ def format_task_prompt(task: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def make_llm(backend: str, task_id: str) -> Any:
+def make_llm(
+    backend: str,
+    task_id: str,
+    config: ExperimentConfig | None = None,
+) -> Any:
+    experiment = config or ExperimentConfig()
     if backend == "mock":
         return MockLLMAdapter(default_mock_actions(task_id))
     if backend == "ollama":
-        return OllamaAdapter()
+        inference = experiment.inference
+        return OllamaAdapter(
+            model_name=inference.model_name,
+            endpoint=inference.endpoint,
+            timeout_seconds=inference.timeout_seconds,
+            think=inference.think,
+            format_mode=inference.format_mode,
+            temperature=inference.temperature,
+            num_predict=inference.num_predict,
+        )
     raise ValueError(f"Unsupported backend: {backend}")
 
 
-def run_demo(task_id: str, trace_out: Path, run_out: Path, *, backend: str) -> dict[str, Any]:
+def run_demo(
+    task_id: str,
+    trace_out: Path,
+    run_out: Path,
+    *,
+    backend: str,
+    config: ExperimentConfig | None = None,
+) -> dict[str, Any]:
+    experiment = config or ExperimentConfig()
     task = read_task(task_id)
     task_url = ROOT / task["start_url"]
     if trace_out.exists():
@@ -354,17 +378,29 @@ def run_demo(task_id: str, trace_out: Path, run_out: Path, *, backend: str) -> d
     started = time.perf_counter()
     trace_recorder = TraceRecorder(trace_out)
     steps_payload: list[dict[str, Any]] = []
+    llm = make_llm(backend, task_id, experiment)
+    schema_path = Path(experiment.inference.action_schema_path)
+    if not schema_path.is_absolute():
+        schema_path = ROOT / schema_path
+    action_schema = json.loads(schema_path.read_text(encoding="utf-8"))
 
     with PlaywrightBrowserExecutor(headless=True) as executor:
         executor.open(task_url)
         tools = BrowserToolsAdapter(executor, trace_recorder)
         runner = BrowserAgentRunner(
-            llm=make_llm(backend, task_id),
+            llm=llm,
             tools=tools,
-            max_steps=8,
-            action_schema=json.loads((ROOT / "configs" / "schema" / "action.schema.json").read_text(encoding="utf-8")),
+            max_steps=experiment.runner.max_steps,
+            max_recovery_attempts=experiment.runner.max_recovery_attempts,
+            max_json_retries=experiment.runner.max_json_retries,
+            action_schema=action_schema,
             safety_policy_text=LLM_SAFETY_PROMPT,
             forbidden_actions=task.get("forbidden_actions") or [],
+            raw_response_preview_chars=experiment.logging.raw_response_preview_chars,
+            request_preview_chars=experiment.logging.request_preview_chars,
+            structured_validation=experiment.inference.structured_validation,
+            dynamic_selector_enum=experiment.inference.dynamic_selector_enum,
+            retry_prompt_mode=experiment.inference.retry_prompt_mode,
         )
         result = runner.run(format_task_prompt(task))
         final_state = collect_final_state(executor, task)
@@ -392,6 +428,9 @@ def run_demo(task_id: str, trace_out: Path, run_out: Path, *, backend: str) -> d
                 "action_type": step.action.action if step.action else None,
                 "target": step.action.target if step.action else None,
                 "value": step.action.value if step.action else None,
+                "reason": step.action.reason if step.action else None,
+                "risk_level": step.action.risk_level if step.action else None,
+                "action_metadata": _artifact_safe_value(step.action.metadata) if step.action else None,
                 "valid_action": bool(validation.ok) if validation is not None else False,
                 "execution_ok": step.result.get("ok") if "ok" in step.result else None,
                 "json_attempts": step.result.get("json_attempts"),
@@ -399,12 +438,17 @@ def run_demo(task_id: str, trace_out: Path, run_out: Path, *, backend: str) -> d
                 "json_after_retry_valid": step.result.get("json_after_retry_valid"),
                 "json_retried": step.result.get("json_retried"),
                 "json_retry_success": step.result.get("json_retry_success"),
+                "json_first_error": step.result.get("json_first_error"),
+                "llm_attempts": step.result.get("llm_attempts") or [],
                 "policy_blocked": policy_blocked,
                 "safety_violation": False,
                 "error_type": error_type,
                 "error": step.error,
                 "extracted_text": step.result.get("extracted_text"),
                 "download_path": step.result.get("download_path"),
+                "result_metadata": _artifact_safe_value(step.result.get("metadata")),
+                "requested_input": _artifact_safe_value(step.result.get("requested_input")),
+                "tool_result": _tool_result_payload(step.result),
                 "recovery_attempt": step.recovery_attempt,
                 "recovery_success": step.recovery_success,
             }
@@ -455,6 +499,8 @@ def run_demo(task_id: str, trace_out: Path, run_out: Path, *, backend: str) -> d
         "run_id": trace_recorder.run_id,
         "status": status,
         "llm_backend": backend,
+        "llm_model": getattr(llm, "model_name", backend),
+        "experiment": experiment.snapshot(),
         "duration_ms": duration_ms,
         "terminal_action": result.terminal_action,
         "agent_answer": agent_answer,
@@ -480,18 +526,68 @@ def _agent_answer(result: Any) -> str:
     return ""
 
 
+def _artifact_safe_value(value: Any) -> Any:
+    """Redact obvious secret-bearing metadata before it enters public artifacts."""
+
+    if isinstance(value, dict):
+        safe: dict[str, Any] = {}
+        for key, item in value.items():
+            if any(marker in str(key).lower() for marker in ["password", "token", "secret", "api_key", "authorization"]):
+                safe[str(key)] = "<redacted>"
+            else:
+                safe[str(key)] = _artifact_safe_value(item)
+        return safe
+    if isinstance(value, list):
+        return [_artifact_safe_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [_artifact_safe_value(item) for item in value]
+    if isinstance(value, str):
+        redacted = re.sub(
+            r"(?i)\b(password|token|secret|api[_-]?key|authorization)(\s*[:=]\s*)([^\s,;]+)",
+            r"\1\2<redacted>",
+            value,
+        )
+        return re.sub(
+            r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
+            "<redacted-email>",
+            redacted,
+        )
+    return value
+
+
+def _tool_result_payload(result: dict[str, Any]) -> dict[str, Any]:
+    excluded = {
+        "json_attempts",
+        "json_first_valid",
+        "json_after_retry_valid",
+        "json_retried",
+        "json_retry_success",
+        "json_first_error",
+        "llm_attempts",
+    }
+    return _artifact_safe_value({key: value for key, value in result.items() if key not in excluded})
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run minimal local browser-agent demo.")
     parser.add_argument("--task-id", default=DEFAULT_TASK_ID)
     parser.add_argument("--trace-out", default="artifacts/traces/integration_browser_trace.jsonl")
     parser.add_argument("--run-out", default="artifacts/traces/integration_mock_run.json")
     parser.add_argument("--backend", choices=["mock", "ollama"], default="mock")
+    parser.add_argument("--config", help="Versioned Phase 2 experiment YAML/JSON config.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    payload = run_demo(args.task_id, Path(args.trace_out), Path(args.run_out), backend=args.backend)
+    config = load_experiment_config(args.config)
+    payload = run_demo(
+        args.task_id,
+        Path(args.trace_out),
+        Path(args.run_out),
+        backend=args.backend,
+        config=config,
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if payload["status"] == "success" else 1
 

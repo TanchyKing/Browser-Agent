@@ -1,6 +1,6 @@
 # P3 Phase 2：评测驱动的 Browser Agent 优化计划
 
-> 修订说明（2026-07-14）：根据对 artifacts、任务定义和源代码的独立复核，补充了原始响应/截断日志、`num_predict` 单变量消融，以及明确的强模型基线与延迟口径。同日第二次修订：将 R11 强模型上界并入里程碑 M4，并在 §11 开头新增依赖关系与可并行工作说明。
+> 修订说明（2026-07-14）：根据对 artifacts、任务定义和源代码的独立复核，补充了原始响应/截断日志、`num_predict` 单变量消融，以及明确的强模型基线与延迟口径。同日第二次修订：将 R11 强模型上界并入里程碑 M4，并在 §11 开头新增依赖关系与可并行工作说明。第三次修订：区分开发 held-out 与最终封存测试，修正重复动作完成逻辑，并补充候选动作审计、固定 suite manifest 和可重建训练 trace 要求。
 
 ## 1. Phase 2 定位
 
@@ -87,6 +87,7 @@ Agent 不应读取 evaluator 私有的精确 `success_check` selector 和答案�
 - 请求侧的 `model`、`think`、`format_mode`、`temperature`、`num_predict`；
 - `json_parse_error`、错误字符位置和 retry 次数；
 - 如 API 返回 thinking 字段，单独记录其长度和脱敏 preview，不能与 final action 混存。
+- 为可重建训练样本另存 Agent 实际收到的 task contract、pre-action observation、action schema/candidate snapshot、工具结果，以及启用状态机后的 state before/after；历史 run artifact 不能反推这些缺失输入。
 
 公开报告只使用脱敏 preview 和聚合计数；未经脱敏的原始页面/模型内容只允许保存在本地隔离 artifact 中。
 
@@ -201,8 +202,8 @@ finished=false
 改进为：
 
 - 同一成功动作连续出现 2 次时，从本轮候选中暂时移除；
-- 将对应 slot 标记为已完成；
-- 强制模型在“下一 pending slot / finish / request_human”中选择；
+- 进入 cooldown 后强制模型在“重新观察 / 其他 pending slot / finish / request_human”中选择；
+- 浏览器返回 `ok=true` 只证明工具调用成功，不能据此把 slot 标记完成；slot 只能由 B2 中与任务相关的可观察 postcondition 更新；
 - 达到重复阈值时由 deterministic controller 接管，而不是继续消耗全部 8 步。
 
 ### B4. 通用 completion verifier
@@ -245,6 +246,8 @@ TOOL_RESULT
 - 当前是否应该 `finish` 或 `request_human`。
 
 critic 的输出同样必须是短 schema，而不是自由文本。
+
+审计必须同时保留 `original_candidate → critic_decision → replacement_candidate → policy_decision → executed_action`。`forbidden_action_not_proposed_rate` 按所有模型原始候选计算，不能因为 critic 在工具执行前拦截就把危险 proposal 从分母中隐藏；`not_executed` 则按真正进入工具层的动作计算。
 
 ### C3. Policy block 后继续安全恢复
 
@@ -345,13 +348,13 @@ critic 的输出同样必须是短 schema，而不是自由文本。
 
 ### E4. 数据拆分
 
-禁止把同一页面模板的相邻步骤随机分到训练集和测试集。应按任务族或页面模板拆分：
+禁止把同一页面模板的相邻步骤随机分到训练集和测试集。微调数据内部应按任务族或页面模板拆分：
 
 - Train：已知任务模板及其数据变体；
 - Validation：同模板、未见过的数据和措辞；
-- Hidden test：未见过的页面布局、selector 命名或注入措辞。
+- Internal test：只基于 visible/development 任务生成、未参与梯度更新的内部测试集。
 
-当前 17 个固定任务继续作为 visible regression suite，但不能作为唯一最终结论。
+当前 17 个固定任务继续作为 visible regression suite，但不能作为唯一最终结论。仓库内提前编写并在每轮查看结果的变体只能称为 development held-out/validation，不能称为最终 hidden test。最终 blind holdout 必须在 R10 controller 与训练数据冻结后由 evaluator 单独封存，期间不得进入 Agent prompt、代码实现或微调数据，只在最终基线/微调模型比较时按预注册规则运行。
 
 ### E5. 训练路线
 
@@ -370,7 +373,7 @@ critic 的输出同样必须是短 schema，而不是自由文本。
 |---|---|---|
 | R0 | 历史 artifact | 保留 Phase 1 原始基线 |
 | R1 | 与 R0 行为和 legacy grader 一致，只增加 A0 日志 | 建立可诊断 replay，确认日志改造不改变 legacy 结果口径 |
-| R2 | R1 的 Agent 配置 + 修正后的 grader/hidden split | 冻结正式 Phase 2 基线；从这里开始比较能力提升 |
+| R2 | R1 的 Agent 配置 + 修正后的 grader/data split | 冻结正式 Phase 2 基线；从这里开始比较能力提升 |
 | R3 | R2 + `think:false` | 单独判断 thinking 对重复、长度和 JSON 的影响 |
 | R4 | R3 + bounded JSON Schema | 判断结构约束能否消除非法 JSON |
 | R5 | R4 下仅改变 `num_predict`：128/256/768 | 判断 token cap、截断和成功率的关系 |
@@ -401,7 +404,7 @@ R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使
 - 历史 visible business 是 4/10；修正 grader 后先记录 R2 基线，在任务集合不变时仍以至少 7/10 为阶段目标，并同时报告相对 R2 的提升；
 - 不再出现成功 select/type 的无限重复；
 - DOM 已满足时能够在下一轮发出 `finish`；
-- hidden variants 相比同一基线也有提升，不能只报告 visible suite。
+- development held-out 相比同一基线也有提升；最终 blind holdout 只在 R10 与 R12 的预注册比较点运行，不能根据其结果继续调参。
 
 ### 10.3 安全任务
 
@@ -421,27 +424,28 @@ R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使
 
 ### 依赖关系与可并行工作
 
-主消融链 R1→R10 必须按矩阵顺序执行：每个实验以上一配置为条件。R11 强模型上界与 R12 微调模型是从冻结的 R10 controller 分出的两条独立比较支线，逻辑上互不依赖，但本机只有一块 8GB GPU，因此评测推理、`qwen3:14b` offload 和 QLoRA 训练仍需串行调度。可并行的是工程实现、任务/数据编写和人工审核，而不是 GPU 工作负载本身。
+主消融链 R1→R10 必须按矩阵顺序执行：每个实验以上一配置为条件。R11 强模型上界与 R12 微调模型是从冻结的 R10 controller 分出的两条独立比较支线，逻辑上互不依赖，但本机只有一块 8GB GPU，因此评测推理、`qwen3:14b` offload 和 QLoRA 训练仍需串行调度。工程实现只有在独立 git worktree 中才允许并行；共享同一目录/HEAD 的会话必须串行。可并行的是隔离 worktree 中的工程实现、任务/数据编写和人工审核，而不是 GPU 工作负载本身。
 
 可并行的四条工作线：
 
-1. **Evaluator 线（与 Agent 代码无关，随时可做）**：grader 泄漏修复、safety answer/content check、hidden variant 任务页编写。可在 R1 legacy replay 运行期间完成开发，R1 归因结束后立即冻结 R2。
+1. **Evaluator 线（与 Agent 代码无关，随时可做）**：grader 泄漏修复、safety answer/content check、development held-out 变体编写。可在 R1 legacy replay 运行期间完成开发，R1 归因结束后立即冻结 R2；最终 blind holdout 在 R10 和训练数据冻结后由独立 evaluator 封存。
 2. **Agent 推理线**：A0 日志、`think:false`、schema-constrained output、`num_predict` 参数化是相互独立的 adapter 改动，可同时实现；实验按 R3→R5 逐个开启即可。
 3. **Controller 线**：`AgentState`、completion verifier（工作流 B）与 pre-action critic、block recovery（工作流 C）可以在工作流 A 实验运行期间用 feature flag 提前开发和单元测试，等 R5/R6 结果确定后按矩阵逐个启用。
 4. **微调准备线（前置最长，应最早启动）**：E3 中不依赖新 controller 的部分——mock 轨迹整理、页面/措辞/selector 变体编写、注入场景的安全/危险动作对、人工审核规范——从 M0 起即可并行推进；数据 schema 中的 `agent_state` 字段等 B1 定型后再回填。E5 的小模型 LoRA 管线冒烟验证只需短时 GPU，可插在两次评测 run 之间完成。
 
 后台任务：`qwen3:14b` 模型包（约 9.3 GB）可提前下载；dashboard 与报告脚本改造可随时进行。
 
-不可打破的硬依赖：R2 冻结前不得开始任何能力消融；R11（强模型上界）和 R12（微调模型）都需要 R10 controller 冻结，但二者互不依赖；R12 的最终训练数据依赖 B1 定型后的 `AgentState` 轨迹格式。
+不可打破的硬依赖：R2 冻结前不得开始任何能力消融；R11（强模型上界）和 R12（微调模型）都需要 R10 controller 冻结，但二者互不依赖；R12 的最终训练数据依赖 B1 定型后的 `AgentState` 轨迹格式；所有 R-run 依赖预先冻结的 suite manifest、统一配置入口和 artifact 内配置快照。
 
 ### M0：冻结基线和评测协议
 
 - 固定当前 4 组 artifact；
+- 新建并冻结精确复现历史 12-run 的 suite manifest，禁止用当前 17-task 默认列表代替；
 - 输出逐 run 失败复盘；
 - 实现 A0 日志字段和脱敏规则；
 - 保持原 prompt、sampling、step budget 和 grader 不变，重跑 12-run business 与 7×3 safety，形成 R1 可诊断基线；
 - 使用 `done_reason/eval_count/raw_response_preview` 对当前 12 个 invalid-JSON 对应场景做截断归因；
-- 随后修复 grader 泄漏和过弱 success check，并建立 visible/hidden 数据边界；
+- 随后修复 grader 泄漏和过弱 success check，并建立 visible/development-held-out/final-blind-holdout 三层边界；
 - grader 修复后再冻结 R2 Phase 2 baseline，不与历史 R0/R1 混算。
 
 ### M1：结构化输出
@@ -481,7 +485,7 @@ R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使
 
 - 完整改进曲线；
 - 每类失败的前后变化；
-- visible 与 hidden test 差距；
+- visible、development held-out 与最终 blind holdout 的差距；
 - 安全、成功率、步数和延迟的权衡；
 - 失败案例与局限性。
 
@@ -492,7 +496,7 @@ R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使
 3. 逐 run error analysis；
 4. schema-constrained Agent；
 5. 带状态管理、completion verifier 和 block recovery 的 runner；
-6. visible regression suite 与 hidden variant suite；
+6. visible regression、development held-out 与最终封存 blind holdout；
 7. 人工审核的微调数据及数据说明；
 8. LoRA/QLoRA adapter 与推理接入说明；
 9. 强模型上界及其 offload/API 独立运行条件说明；

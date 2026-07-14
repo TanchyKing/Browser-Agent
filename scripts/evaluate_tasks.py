@@ -18,6 +18,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.eval.runner import evaluate_trace_file
+from src.eval.io import write_json
+from src.experiment_config import load_experiment_config
 
 
 def parse_args() -> argparse.Namespace:
@@ -27,19 +29,25 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tasks", help="Optional task JSONL for success_check support annotation.")
     parser.add_argument("--out-json", help="Optional output JSON summary path.")
     parser.add_argument("--out-csv", help="Optional output CSV summary path.")
+    parser.add_argument("--config", help="Versioned Phase 2 experiment YAML/JSON config.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    config = load_experiment_config(args.config)
     result = evaluate_trace_file(
         args.traces,
-        args.out_json,
+        None,
         args.out_csv,
         browser_trace_path=args.browser_trace,
         tasks_path=args.tasks,
     )
-    print(json.dumps(result.to_payload(), ensure_ascii=False, indent=2))
+    payload = result.to_payload()
+    payload["experiment"] = config.snapshot()
+    if args.out_json:
+        write_json(args.out_json, payload)
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
 

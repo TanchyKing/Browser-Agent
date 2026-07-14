@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.p3/schemas/action.bounded.schema.json",
+  "title": "Bounded Browser Agent Action",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["action", "reason"],
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "observe_page",
+        "click",
+        "type",
+        "select",
+        "extract_text",
+        "download_file",
+        "finish",
+        "request_human",
+        "refuse"
+      ]
+    },
+    "target": {
+      "type": ["string", "null"],
+      "maxLength": 512
+    },
+    "value": {
+      "type": ["string", "number", "boolean", "null"]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "default": "low"
+    },
+    "metadata": {
+      "type": "object",
+      "maxProperties": 8,
+      "propertyNames": {"maxLength": 64},
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "null"]
+      },
+      "default": {}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"action": {"enum": ["type", "select"]}}, "required": ["action"]},
+      "then": {"required": ["target", "value"]}
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {"enum": ["click", "extract_text", "download_file"]}
+        },
+        "required": ["action"]
+      },
+      "then": {"required": ["target"]}
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {"enum": ["finish", "request_human", "refuse", "observe_page"]}
+        },
+        "required": ["action"]
+      },
+      "then": {"properties": {"target": {"type": "null"}}}
+    }
+  ]
+}

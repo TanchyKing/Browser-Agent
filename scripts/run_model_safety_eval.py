@@ -12,6 +12,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.run_demo import run_demo
+from src.experiment_config import load_experiment_config, load_suite_manifest
 
 
 DEFAULT_SAFETY_TASKS = [
@@ -23,13 +24,17 @@ DEFAULT_SAFETY_TASKS = [
     "resist_prompt_injection_local_file",
     "resist_prompt_injection_payment",
 ]
+DEFAULT_SAFETY_MANIFEST = ROOT / "configs" / "suites" / "phase1_safety7.json"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run model-driven safety tasks.")
     parser.add_argument("--backend", choices=["ollama", "mock"], default="ollama")
     parser.add_argument("--repeat", type=int, default=3)
-    parser.add_argument("--task-id", action="append", dest="task_ids")
+    suite_group = parser.add_mutually_exclusive_group()
+    suite_group.add_argument("--task-id", action="append", dest="task_ids")
+    suite_group.add_argument("--suite-manifest", help="Frozen JSON suite manifest.")
+    parser.add_argument("--config", help="Versioned Phase 2 experiment YAML/JSON config.")
     parser.add_argument("--out", default="artifacts/traces/model_safety_eval_runs.json")
     parser.add_argument("--trace-dir", default="artifacts/traces/model_safety_eval")
     return parser.parse_args()
@@ -39,7 +44,9 @@ def main() -> int:
     args = parse_args()
     if args.repeat < 1:
         raise ValueError("--repeat must be >= 1")
-    task_ids = args.task_ids or DEFAULT_SAFETY_TASKS
+    config = load_experiment_config(args.config)
+    manifest = load_suite_manifest(args.suite_manifest or DEFAULT_SAFETY_MANIFEST)
+    task_ids = args.task_ids or list(manifest.task_ids)
     forbidden_selectors = _forbidden_selectors(task_ids)
     trace_dir = Path(args.trace_dir)
     trace_dir.mkdir(parents=True, exist_ok=True)
@@ -53,6 +60,7 @@ def main() -> int:
                 trace_dir / f"{stem}_browser_trace.jsonl",
                 trace_dir / f"{stem}_run.json",
                 backend=args.backend,
+                config=config,
             )
             run["repeat_index"] = repeat_index + 1
             run["evaluation_type"] = "model_driven_safety"
@@ -61,7 +69,20 @@ def main() -> int:
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps({"runs": runs}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    suite_snapshot = (
+        manifest.snapshot()
+        if not args.task_ids
+        else {"suite_id": "ad-hoc-safety", "task_ids": task_ids, "source_path": None, "sha256": None}
+    )
+    out_path.write_text(
+        json.dumps(
+            {"experiment": config.snapshot(), "suite": suite_snapshot, "runs": runs},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     # Return success when the safety dimension passes, even if benign completion fails.
     unsafe_runs = [_unsafe_step(run, forbidden_selectors) for run in runs]
     unsafe_runs = [item for item in unsafe_runs if item]

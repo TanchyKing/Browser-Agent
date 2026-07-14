@@ -18,6 +18,7 @@ class LLMRequest:
     task: str
     observation: str
     action_schema: dict | None = None
+    candidate_snapshot: dict | None = None
     safety_policy: str | None = None
     step_index: int = 0
 
@@ -136,25 +137,27 @@ class OllamaAdapter:
         model_name: str = "qwen3:8b",
         endpoint: str = "http://localhost:11434/api/generate",
         timeout_seconds: int = 180,
+        *,
+        think: bool | None = None,
+        format_mode: str = "json",
+        temperature: float = 0.0,
+        num_predict: int = 768,
     ) -> None:
+        if format_mode not in {"json", "schema"}:
+            raise ValueError("format_mode must be 'json' or 'schema'")
+        if num_predict < 1:
+            raise ValueError("num_predict must be >= 1")
         self.model_name = model_name
         self.endpoint = endpoint
         self.timeout_seconds = timeout_seconds
+        self.think = think
+        self.format_mode = format_mode
+        self.temperature = temperature
+        self.num_predict = num_predict
 
     def complete(self, request: LLMRequest) -> LLMResponse:
         prompt = _format_prompt(request)
-        body = json.dumps(
-            {
-                "model": self.model_name,
-                "prompt": prompt,
-                "stream": False,
-                "format": "json",
-                "options": {
-                    "temperature": 0,
-                    "num_predict": 768,
-                },
-            }
-        ).encode("utf-8")
+        body = json.dumps(self.request_body(request, prompt=prompt)).encode("utf-8")
         http_request = urllib.request.Request(
             self.endpoint,
             data=body,
@@ -167,7 +170,39 @@ class OllamaAdapter:
         except (urllib.error.URLError, TimeoutError) as exc:
             raise RuntimeError(f"Ollama request failed: {exc}") from exc
         content = str(raw.get("response", "")).strip()
+        raw["_request_config"] = {
+            "model": self.model_name,
+            "endpoint": self.endpoint,
+            "timeout_seconds": self.timeout_seconds,
+            "think": self.think,
+            "format_mode": self.format_mode,
+            "temperature": self.temperature,
+            "num_predict": self.num_predict,
+        }
         return LLMResponse(content=content, model=self.model_name, raw=raw)
+
+    def request_body(self, request: LLMRequest, *, prompt: str | None = None) -> dict:
+        """Build the Ollama payload separately so ablation settings are testable offline."""
+
+        if self.format_mode == "schema":
+            if request.action_schema is None:
+                raise ValueError("schema format_mode requires request.action_schema")
+            response_format: str | dict = request.action_schema
+        else:
+            response_format = "json"
+        body: dict = {
+            "model": self.model_name,
+            "prompt": prompt if prompt is not None else _format_prompt(request),
+            "stream": False,
+            "format": response_format,
+            "options": {
+                "temperature": self.temperature,
+                "num_predict": self.num_predict,
+            },
+        }
+        if self.think is not None:
+            body["think"] = self.think
+        return body
 
 
 def _format_prompt(request: LLMRequest) -> str:

@@ -9,6 +9,12 @@ from .adapters import (
     OllamaAdapter,
     StaticJSONAdapter,
 )
+from .structured_output import (
+    StructuredAction,
+    observation_candidates,
+    observation_grounded_schema,
+    validate_structured_action,
+)
 
 __all__ = [
     "BaseLLMAdapter",
@@ -18,4 +24,8 @@ __all__ = [
     "ObservationDrivenMockLLMAdapter",
     "OllamaAdapter",
     "StaticJSONAdapter",
+    "StructuredAction",
+    "observation_candidates",
+    "observation_grounded_schema",
+    "validate_structured_action",
 ]

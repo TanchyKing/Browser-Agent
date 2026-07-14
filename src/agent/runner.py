@@ -6,12 +6,22 @@ the browser-tool lane provides a real Playwright implementation.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from src.agent.actions import AgentAction
 from src.agent.safety import SafetyDecision, SafetyPolicy
-from src.llm import BaseLLMAdapter, LLMRequest
+from src.llm import (
+    BaseLLMAdapter,
+    LLMRequest,
+    LLMResponse,
+    observation_candidates,
+    observation_grounded_schema,
+    validate_structured_action,
+)
 
 
 class BrowserTools(Protocol):
@@ -53,6 +63,11 @@ class BrowserAgentRunner:
         action_schema: dict[str, Any] | None = None,
         safety_policy_text: str | None = None,
         forbidden_actions: list[dict[str, Any]] | None = None,
+        raw_response_preview_chars: int = 8192,
+        request_preview_chars: int = 32768,
+        structured_validation: bool = False,
+        dynamic_selector_enum: bool = False,
+        retry_prompt_mode: str = "legacy",
     ) -> None:
         if max_steps < 1:
             raise ValueError("max_steps must be >= 1")
@@ -60,6 +75,8 @@ class BrowserAgentRunner:
             raise ValueError("max_recovery_attempts must be >= 0")
         if max_json_retries < 0:
             raise ValueError("max_json_retries must be >= 0")
+        if retry_prompt_mode not in {"legacy", "bounded"}:
+            raise ValueError("retry_prompt_mode must be 'legacy' or 'bounded'")
         self.llm = llm
         self.tools = tools
         self.safety_policy = safety_policy or SafetyPolicy()
@@ -69,6 +86,11 @@ class BrowserAgentRunner:
         self.action_schema = action_schema
         self.safety_policy_text = safety_policy_text
         self.forbidden_actions = list(forbidden_actions or [])
+        self.raw_response_preview_chars = raw_response_preview_chars
+        self.request_preview_chars = request_preview_chars
+        self.structured_validation = structured_validation
+        self.dynamic_selector_enum = dynamic_selector_enum
+        self.retry_prompt_mode = retry_prompt_mode
 
     def run(self, task: str) -> AgentRunResult:
         steps: list[AgentStep] = []
@@ -209,21 +231,50 @@ class BrowserAgentRunner:
         request_observation = observation
         first_error: str | None = None
         last_error: str | None = None
+        attempt_audits: list[dict[str, Any]] = []
         while attempts <= self.max_json_retries:
             attempts += 1
-            llm_response = self.llm.complete(
-                LLMRequest(
-                    task=task,
-                    observation=request_observation,
-                    action_schema=self.action_schema,
-                    safety_policy=self.safety_policy_text,
-                    step_index=step_index,
+            request_schema = self.action_schema
+            selector_candidates, option_candidates = observation_candidates(request_observation)
+            candidate_snapshot = {
+                "selectors": selector_candidates,
+                "select_options": option_candidates,
+            }
+            if self.dynamic_selector_enum and self.action_schema is not None:
+                request_schema, candidate_snapshot = observation_grounded_schema(
+                    self.action_schema,
+                    request_observation,
                 )
+            request_task = task
+            if attempts > 1 and self.retry_prompt_mode == "bounded":
+                request_task = _short_task_summary(task)
+            llm_request = LLMRequest(
+                task=request_task,
+                observation=request_observation,
+                action_schema=request_schema,
+                candidate_snapshot=candidate_snapshot,
+                safety_policy=self.safety_policy_text,
+                step_index=step_index,
             )
+            llm_response = self.llm.complete(llm_request)
             try:
-                action = AgentAction.from_mapping(llm_response.as_json())
+                action_payload = llm_response.as_json()
+                if self.structured_validation:
+                    action_payload = validate_structured_action(action_payload)
+                action = AgentAction.from_mapping(action_payload)
             except Exception as exc:
                 last_error = str(exc)
+                attempt_audits.append(
+                    _llm_attempt_audit(
+                        attempt=attempts,
+                        request=llm_request,
+                        response=llm_response,
+                        parse_valid=False,
+                        parse_error=last_error,
+                        request_preview_chars=self.request_preview_chars,
+                        raw_response_preview_chars=self.raw_response_preview_chars,
+                    )
+                )
                 if first_error is None:
                     first_error = last_error
                 if attempts > self.max_json_retries:
@@ -236,11 +287,30 @@ class BrowserAgentRunner:
                             retry_success=False,
                             error=last_error,
                             first_error=first_error,
+                            attempt_audits=attempt_audits,
                         ),
                         request_observation,
                     )
-                request_observation = _with_json_retry_context(observation, last_error, attempts)
+                if self.retry_prompt_mode == "bounded":
+                    request_observation = _with_bounded_json_retry_context(
+                        observation,
+                        last_error,
+                        attempts,
+                    )
+                else:
+                    request_observation = _with_json_retry_context(observation, last_error, attempts)
                 continue
+            attempt_audits.append(
+                _llm_attempt_audit(
+                    attempt=attempts,
+                    request=llm_request,
+                    response=llm_response,
+                    parse_valid=True,
+                    parse_error=None,
+                    request_preview_chars=self.request_preview_chars,
+                    raw_response_preview_chars=self.raw_response_preview_chars,
+                )
+            )
             return (
                 action,
                 _llm_result(
@@ -250,6 +320,7 @@ class BrowserAgentRunner:
                     retry_success=attempts > 1,
                     error=None,
                     first_error=first_error,
+                    attempt_audits=attempt_audits,
                 ),
                 request_observation,
             )
@@ -306,6 +377,31 @@ def _with_json_retry_context(observation: str, error: str, attempt: int) -> str:
         f"invalid_json_error={error}\n"
         "Return exactly one compact valid JSON object. Do not include markdown, comments, or copied page text."
     )
+
+
+def _with_bounded_json_retry_context(observation: str, error: str, attempt: int) -> str:
+    selector_lines = [
+        line.strip()
+        for line in observation.splitlines()
+        if line.strip().startswith("- selector: ")
+    ]
+    selectors = "\n".join(selector_lines[:100]) or "- no grounded selector available"
+    return (
+        "Bounded JSON correction context (page prose intentionally omitted):\n"
+        f"json_retry_attempt={attempt}\n"
+        f"validation_error={error[:500]}\n"
+        "Available grounded elements:\n"
+        f"{selectors}\n"
+        "Return exactly one compact object matching the supplied action schema. "
+        "Do not copy page prose or error text into any field."
+    )
+
+
+def _short_task_summary(task: str, max_chars: int = 500) -> str:
+    compact = " ".join(task.split())
+    if len(compact) <= max_chars:
+        return compact
+    return compact[:max_chars].rsplit(" ", 1)[0] + "…"
 
 
 def _format_recovery_context(action: AgentAction, result: dict[str, Any], attempt: int) -> str:
@@ -371,6 +467,7 @@ def _llm_result(
     retry_success: bool,
     error: str | None,
     first_error: str | None,
+    attempt_audits: list[dict[str, Any]],
 ) -> dict[str, Any]:
     result: dict[str, Any] = {
         "json_attempts": attempts,
@@ -378,6 +475,7 @@ def _llm_result(
         "json_after_retry_valid": after_retry_valid,
         "json_retried": attempts > 1,
         "json_retry_success": retry_success,
+        "llm_attempts": attempt_audits,
     }
     if error:
         result["error"] = error
@@ -396,7 +494,110 @@ def _with_llm_result(result: dict[str, Any], llm_result: dict[str, Any]) -> dict
         "json_retried",
         "json_retry_success",
         "json_first_error",
+        "llm_attempts",
     ]:
         if key in llm_result:
             merged[key] = llm_result[key]
     return merged
+
+
+def _llm_attempt_audit(
+    *,
+    attempt: int,
+    request: LLMRequest,
+    response: LLMResponse,
+    parse_valid: bool,
+    parse_error: str | None,
+    request_preview_chars: int,
+    raw_response_preview_chars: int,
+) -> dict[str, Any]:
+    raw = response.raw if isinstance(response.raw, dict) else {}
+    schema_json = (
+        json.dumps(request.action_schema, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if request.action_schema is not None
+        else ""
+    )
+    thinking = str(raw.get("thinking") or "")
+    done_reason = raw.get("done_reason")
+    audit: dict[str, Any] = {
+        "attempt": attempt,
+        "request": {
+            "step_index": request.step_index,
+            "task_preview": _redacted_preview(request.task, request_preview_chars),
+            "task_chars": len(request.task),
+            "task_sha256": _sha256_text(request.task),
+            "observation_preview": _redacted_preview(request.observation, request_preview_chars),
+            "observation_chars": len(request.observation),
+            "observation_sha256": _sha256_text(request.observation),
+            "action_schema": request.action_schema,
+            "action_schema_sha256": _sha256_text(schema_json) if schema_json else None,
+            "candidate_snapshot": request.candidate_snapshot,
+            "safety_policy_preview": _redacted_preview(
+                request.safety_policy or "",
+                request_preview_chars,
+            ),
+        },
+        "response": {
+            "model": response.model,
+            "raw_response_preview": _redacted_preview(response.content, raw_response_preview_chars),
+            "raw_response_chars": len(response.content),
+            "raw_response_sha256": _sha256_text(response.content),
+            "thinking_preview": _redacted_preview(thinking, raw_response_preview_chars),
+            "thinking_chars": len(thinking),
+            "thinking_sha256": _sha256_text(thinking) if thinking else None,
+            "done": raw.get("done"),
+            "done_reason": done_reason,
+            "truncated": done_reason == "length" or raw.get("done") is False,
+            "prompt_eval_count": raw.get("prompt_eval_count"),
+            "eval_count": raw.get("eval_count"),
+            "prompt_eval_duration": raw.get("prompt_eval_duration"),
+            "eval_duration": raw.get("eval_duration"),
+            "total_duration": raw.get("total_duration"),
+            "load_duration": raw.get("load_duration"),
+        },
+        "parse_valid": parse_valid,
+        "parse_error": parse_error,
+    }
+    request_config = raw.get("_request_config")
+    audit["request"]["inference"] = (
+        dict(request_config) if isinstance(request_config, dict) else {"model": response.model}
+    )
+    audit["parse_error_position"] = _json_error_position(parse_error)
+    return audit
+
+
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _redacted_preview(value: str, max_chars: int) -> str:
+    redacted = re.sub(
+        r"(?i)\b(password|token|secret|api[_-]?key|authorization)(\s*[:=]\s*)([^\s,;]+)",
+        r"\1\2<redacted>",
+        value,
+    )
+    redacted = re.sub(
+        r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
+        "<redacted-email>",
+        redacted,
+    )
+    redacted = re.sub(
+        r"(?i)\bfile:///(?:[^\s]+)",
+        "file:///<redacted-local-path>",
+        redacted,
+    )
+    if max_chars == 0:
+        return ""
+    if len(redacted) <= max_chars:
+        return redacted
+    head_chars = max_chars // 2
+    tail_chars = max_chars - head_chars
+    omitted = len(redacted) - max_chars
+    return redacted[:head_chars] + f"\n<truncated {omitted} chars>\n" + redacted[-tail_chars:]
+
+
+def _json_error_position(error: str | None) -> int | None:
+    if not error:
+        return None
+    match = re.search(r"\bchar\s+(\d+)\b", error)
+    return int(match.group(1)) if match else None
