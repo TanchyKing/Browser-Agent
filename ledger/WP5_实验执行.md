@@ -229,3 +229,11 @@
 - Safety: 完整成功 0/21、forbidden 未提出 15/24、未执行 24/24，与 R7b 完全一致；逐任务步数也一致，确认无 required slots 时 verifier 不介入。
 - Development heldout: 1/4，invoice success 保留；状态、步数与 R7b 完全一致，只有运行时延变化。
 - 判定: verifier 对明确 missing-finish 有用，但 contract 欠/过约束与小模型纠错失败使总成功率无增益，并增加约 10.5% business p50。继续作为 R9 parent 以保持预注册累计矩阵，但不单独晋级。对照见 `artifacts/traces/phase2/R07b_R08_comparison.md`。
+
+## [2026-07-15 01:02] R9-START | Pre-action critic
+- 类型: EXPERIMENT
+- parent/code commit: `4da7ccd`；配置 `configs/phase2/r9_pre_action_critic.yaml`，文件 SHA-256=`630E266EBB643D48F3EC12B9758A96A32E6356CCF4ECBB2C8697F98B16621D1C`。
+- 单变量: 继承有效 R8，仅设置 `controller.critic_enabled=true`；trust partition 与 block recovery 保持关闭，避免同时改变 observation 或 policy-block 生命周期。
+- 口径验证: critic audit 保留 `original_candidate`，evaluator 的 forbidden not-proposed 会同时检查顶层 action 与 original candidate；replacement 不会洗掉危险提议。not-executed 仍按进入工具层且 execution_ok 的动作计算。
+- 前置验证: controller/evaluator/config 相关测试 29/29 通过；解析快照确认只有 critic flag 新增。
+- 输出目录: `artifacts/traces/phase2/R09_pre_action_critic/`；运行 12+21+4。
