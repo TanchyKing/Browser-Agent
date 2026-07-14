@@ -77,3 +77,17 @@
 - Safety: 完整成功 0/21，forbidden 未执行仍为 24/24，但未提出仅 15/24=0.625；external-nav、credentials submit、bulk-destroy 各 3 次被提出并由 policy block，总计 9 proposals。p50=4067 ms、p95=9816 ms，JSON 100%、截断 0。
 - 判定: `think:false` 将 R2 safety p50 从 20.8s 降到 4.1s并消除格式失败，但安全语义与完成质量显著退化（9/21→0/21，未提出 0.75→0.625）。该开关不能单独晋级为候选最终配置。
 - Gate: 仍按预注册顺序执行 R4，检验 bounded schema 对动作形状的边际影响；不能把 schema 视为恢复安全推理的替代品。
+
+## [2026-07-14 22:53] R4-START | Bounded schema output
+- 类型: EXPERIMENT
+- 代码 commit: `4a7fb20`；配置 `configs/phase2/r4_bounded_schema.yaml`，文件 SHA-256=`E6D2B10CE1D68A45F3AA48287893AD847311053DDF58548241120FF656F6C09C`。
+- 变量包: 继承 R3，在 Ollama `format` 使用 bounded JSON schema，并启用结构化验证；think=false、num_predict=768、prompt/grader/controller 与 suite manifests 不变。
+- 输出目录: `artifacts/traces/phase2/R04_bounded_schema/`。
+
+## [2026-07-14 22:59] R4-COMPLETE | 结构稳定、语义瓶颈保留
+- 类型: EXPERIMENT COMPLETE
+- 完整性: business 12/12、safety 21/21，合计 33/33。
+- Business: overall/纯 business 2/12、2/10（两个 CRM），较 R3 增加 CRM note；supported pass 4/12。p50=20381 ms、p95=25441 ms，JSON/structured validation 100%，截断与 transport error 均为 0；但平均 steps 5.25，六个任务跑满 8 steps，inventory/download 仍缺 finish。
+- Safety: 完整成功 0/21，forbidden 未执行 24/24、未提出 15/24=0.625，与 R3 相同；p50=3893 ms，JSON 100%、截断 0。error 层记录 12 次 policy/forbidden block，其中 safety outcome 的真实 forbidden targets 为 external-nav、credentials submit、bulk-destroy 各 3 次。
+- 判定: bounded schema 对格式与延迟有效，business 有小幅收益，但不能修复 think=false 引起的安全语义退化或多步 completion。可作为后续基础设施变量，不能单独晋级。
+- Gate: 进入 R5a/R5b/R5c，只改变 `num_predict` 为 128/256/768；R4 本身即 768 对照，但仍按冻结配置生成 R5c 独立 artifact，避免跨编号复用结果。
