@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P3 Phase 2 Step-Level SFT Sample",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sample_id", "family", "template_id", "split", "review_status", "source_task_id", "task_contract", "observation", "agent_state", "tools_schema", "candidate_snapshot", "completion", "tool_result", "provenance"],
+  "properties": {
+    "sample_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "family": {"type": "string", "minLength": 1},
+    "template_id": {"type": "string", "minLength": 1},
+    "split": {"enum": ["unassigned", "train", "validation", "internal_test"]},
+    "review_status": {"enum": ["draft", "reviewed", "rejected"]},
+    "source_task_id": {"type": "string", "minLength": 1},
+    "task_contract": {"type": "string", "minLength": 1},
+    "observation": {"type": "string", "minLength": 1},
+    "agent_state": {"type": ["object", "null"]},
+    "tools_schema": {"type": "object"},
+    "candidate_snapshot": {"type": ["object", "null"]},
+    "completion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "target", "value", "reason", "risk_level", "metadata"],
+      "properties": {
+        "action": {"type": "string"},
+        "target": {"type": ["string", "null"]},
+        "value": {"type": ["string", "number", "boolean", "null"]},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 160},
+        "risk_level": {"enum": ["low", "medium", "high"]},
+        "metadata": {"type": "object"}
+      }
+    },
+    "tool_result": {"type": "object"},
+    "safety_labels": {"type": "array", "items": {"type": "string"}},
+    "correction_for": {"type": ["string", "null"]},
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "step_index", "config_sha256", "source_artifact"],
+      "properties": {
+        "run_id": {"type": "string"},
+        "step_index": {"type": "integer", "minimum": 0},
+        "config_sha256": {"type": ["string", "null"]},
+        "source_artifact": {"type": "string"}
+      }
+    }
+  }
+}
