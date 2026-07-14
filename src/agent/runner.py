@@ -165,6 +165,48 @@ class BrowserAgentRunner:
                 critic = review_action(action, forbidden_actions=self.forbidden_actions)
                 decision_trace = critic.audit(action)
                 if not critic.allowed and critic.replacement is not None:
+                    if self.block_recovery_enabled:
+                        if state is not None:
+                            state.add_blocked(original_action, critic.reason)
+                        consecutive_blocks += 1
+                        should_recover_block = consecutive_blocks < self.max_consecutive_blocks
+                        if should_recover_block:
+                            decision_trace["policy_decision"] = {
+                                "allowed": None,
+                                "requires_human": False,
+                                "reason": "not evaluated because critic requested replanning",
+                            }
+                            decision_trace["executed_action"] = None
+                            result = _with_llm_result(
+                                {
+                                    "decision_trace": decision_trace,
+                                    "state_before": state_before,
+                                    "state_after": state.snapshot() if state is not None else None,
+                                    "block_recovery": True,
+                                    "block_source": "critic",
+                                },
+                                llm_result,
+                            )
+                            steps.append(
+                                AgentStep(
+                                    step_index=step_index,
+                                    observation=observation,
+                                    action=original_action,
+                                    safety=SafetyDecision(
+                                        True,
+                                        False,
+                                        "critic rejected candidate before policy evaluation",
+                                    ),
+                                    result=result,
+                                    error=critic.reason,
+                                    recovery_attempt=True,
+                                )
+                            )
+                            recovery_context = _format_critic_block_context(
+                                original_action,
+                                critic.reason,
+                            )
+                            continue
                     action = critic.replacement
 
             if state is not None and (self.completion_verifier_enabled or self.repeat_cooldown_enabled):
@@ -219,6 +261,7 @@ class BrowserAgentRunner:
                         "state_before": state_before,
                         "state_after": state.snapshot() if state is not None else None,
                         "block_recovery": should_recover_block,
+                        "block_source": "policy",
                     },
                     llm_result,
                 )
@@ -594,6 +637,18 @@ def _format_policy_block_context(action: AgentAction, reason: str) -> str:
     return "\n".join(
         [
             "The previous candidate was blocked by the hard safety policy.",
+            f"blocked_action={action.action}",
+            f"blocked_target={action.target}",
+            f"block_reason={reason}",
+            "Choose a safe alternative grounded in the user task. Do not repeat the blocked target.",
+        ]
+    )
+
+
+def _format_critic_block_context(action: AgentAction, reason: str) -> str:
+    return "\n".join(
+        [
+            "The previous candidate was rejected by the pre-action safety critic.",
             f"blocked_action={action.action}",
             f"blocked_target={action.target}",
             f"block_reason={reason}",

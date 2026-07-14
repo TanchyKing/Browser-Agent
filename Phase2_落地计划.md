@@ -2,7 +2,7 @@
 
 > 本文是 `Phase2_评测驱动Agent优化计划.md`（下称"总计划"）的执行版，供多个 Codex 会话并行认领工作。
 > 逐 run 证据见 `完整测试逐步复盘.md`（下称"复盘"）。本文不重复其内容，只规定"谁做什么、按什么顺序、如何验证、何时停"。
-> 复核修订（2026-07-14）：补充单 worktree 执行限制、固定 12-run manifest、统一配置入口、训练 trace、critic 候选审计和最终 blind holdout；修正重复动作完成逻辑与 WP 间硬依赖。
+> 复核修订（2026-07-14）：补充单 worktree 执行限制、固定 12-run manifest、统一配置入口、训练 trace、critic 候选审计和最终 blind holdout；修正重复动作完成逻辑与 WP 间硬依赖。R9 后修订（2026-07-15）：R10 的 recovery 统一覆盖 critic reject 与 policy block，关闭开关时保持 R9 行为可复现。
 
 ---
 
@@ -147,7 +147,7 @@ R1 legacy replay 要求"除 A0 日志外一切与 Phase 1 相同"。因此：
 4. **Completion verifier（B4）**：只用 Agent 可观察状态 + 任务合同判断 pending slot、保存/下载证据、finish 是否过早。验证：inventory/download 在成功证据出现后应提示 finish；invoice 的过早 finish 应拦截；extract 有足够证据时正常放行。
 5. **信任分区（C1）**：observation 按 TRUSTED_SYSTEM_POLICY / TRUSTED_USER_TASK / UNTRUSTED_PAGE_ELEMENTS / UNTRUSTED_PAGE_TEXT / TOOL_RESULT 分区标注。验证：注入页面文本被标注为 UNTRUSTED 的单元测试。
 6. **Pre-action critic（C2）**：短 schema 输出；位于程序硬护栏之前，不替代护栏。必须序列化 `original_candidate → critic_decision → replacement_candidate → policy_decision → executed_action`。`not_proposed` 按所有原始候选计算，不能因 critic 拦截而虚假提高；`not_executed` 按工具层实际执行计算。
-7. **Block recovery（C3）**：policy block 后不再立即终止——记录 blocked action → 写入 `AgentState.blocked_actions` → 重新观察 → 从安全 selector 中选替代动作 → 连续阻断才 `request_human/refuse`。程序 policy 保留最终否决权。验证：单元测试模拟 external-nav 场景（复盘 §6.3）：第 1 次提议被阻断后，runner 继续而非返回失败。
+7. **Block recovery（C3）**：critic reject 或 policy block 后不再立即终止——记录原始 blocked action 与来源 → 写入 `AgentState.blocked_actions` → 重新观察 → 从安全 selector 中选替代动作 → 连续阻断才 `request_human/refuse`。critic reject 的 trace 记录 policy 未评估、action 未执行；程序 policy 保留最终否决权。验证：分别模拟 critic 先拦截的 forbidden click 与 policy 直接阻断的 external-nav/extract 场景，第 1 次阻断后 runner 都继续而非返回失败。
 8. 全量 pytest + mock 17/17（所有 flag 关闭时零行为变化；逐个打开时 mock 套件仍全绿）+ 台账 `HANDOFF`。
 
 **完成标准**：七个组件各自有开关、有单测；全关 = legacy；mock 下逐个开启不破坏 17/17。

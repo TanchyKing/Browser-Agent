@@ -1,6 +1,6 @@
 # P3 Phase 2：评测驱动的 Browser Agent 优化计划
 
-> 修订说明（2026-07-14）：根据对 artifacts、任务定义和源代码的独立复核，补充了原始响应/截断日志、`num_predict` 单变量消融，以及明确的强模型基线与延迟口径。同日第二次修订：将 R11 强模型上界并入里程碑 M4，并在 §11 开头新增依赖关系与可并行工作说明。第三次修订：区分开发 held-out 与最终封存测试，修正重复动作完成逻辑，并补充候选动作审计、固定 suite manifest 和可重建训练 trace 要求。
+> 修订说明（2026-07-14）：根据对 artifacts、任务定义和源代码的独立复核，补充了原始响应/截断日志、`num_predict` 单变量消融，以及明确的强模型基线与延迟口径。同日第二次修订：将 R11 强模型上界并入里程碑 M4，并在 §11 开头新增依赖关系与可并行工作说明。第三次修订：区分开发 held-out 与最终封存测试，修正重复动作完成逻辑，并补充候选动作审计、固定 suite manifest 和可重建训练 trace 要求。第四次修订（2026-07-15）：根据 R9 实测，明确 R10 的 block recovery 同时覆盖 critic reject 与 policy block，避免 critic 的终端 replacement 提前截断恢复路径。
 
 ## 1. Phase 2 定位
 
@@ -250,17 +250,17 @@ critic 的输出同样必须是短 schema，而不是自由文本。
 
 审计必须同时保留 `original_candidate → critic_decision → replacement_candidate → policy_decision → executed_action`。`forbidden_action_not_proposed_rate` 按所有模型原始候选计算，不能因为 critic 在工具执行前拦截就把危险 proposal 从分母中隐藏；`not_executed` 则按真正进入工具层的动作计算。
 
-### C3. Policy block 后继续安全恢复
+### C3. Critic / policy block 后继续安全恢复
 
-当前 runner 在 policy block 后立即结束。Phase 2 应改成：
+R9 实测表明，只恢复 policy block 不够：pre-action critic 会先把高风险候选替换为终端 `request_human`，使这些任务根本到不了 policy recovery。R10 开启 `block_recovery` 后，critic reject 与 policy block 都应进入同一恢复生命周期；该开关关闭时保持 R9 的终端 replacement 行为不变。恢复流程为：
 
-1. 记录被阻断动作；
+1. 记录被 critic 或 policy 阻断的原始动作和阻断来源；
 2. 将阻断原因写入 `AgentState.blocked_actions`；
 3. 重新观察页面；
 4. 要求 planner 从安全 selector 中选择替代动作；
 5. 只在连续阻断或没有安全路径时 `request_human/refuse`。
 
-程序侧 policy 仍拥有最终否决权。
+critic reject 的恢复 trace 必须明确 `policy_decision=not evaluated`、`executed_action=null`，不能把未进入 policy/工具层的候选记成已执行。程序侧 policy 仍拥有最终否决权。
 
 ## 7. 工作流 D：模型横向基线
 

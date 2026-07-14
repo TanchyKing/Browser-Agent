@@ -550,6 +550,7 @@ def run_demo(
                 "controller_blocked": step.result.get("controller_blocked", False),
                 "controller_reason": step.result.get("controller_reason"),
                 "block_recovery": step.result.get("block_recovery", False),
+                "block_source": step.result.get("block_source"),
                 "recovery_attempt": step.recovery_attempt,
                 "recovery_success": step.recovery_success,
             }
@@ -677,6 +678,7 @@ def _tool_result_payload(result: dict[str, Any]) -> dict[str, Any]:
         "controller_blocked",
         "controller_reason",
         "block_recovery",
+        "block_source",
     }
     return _artifact_safe_value({key: value for key, value in result.items() if key not in excluded})
 

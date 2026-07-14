@@ -17,3 +17,9 @@
 - 验证: controller all-flags mock 17/17；legacy flags-off mock 17/17；与 Phase 1 规范化语义投影 0 mismatch；全量 pytest 通过（1 项环境相关测试 skipped）。
 - GPU Gate: 未运行 R3–R10 正式套件。
 - 下一步: WP5 先串行冻结 R1/R2，再运行 R3–R5；依据 R5 真实结果生成 R6 config，随后按 state/verifier/critic/recovery 单变量顺序生成 R7–R10 配置。工程线可继续 WP4 数据与训练管线准备，但不得启动训练。
+
+## [2026-07-15 01:16] R10-CORRECTION | Recovery 覆盖 critic reject
+- 类型: CORRECTION / VERIFY
+- R9 实测发现原 block recovery 只处理 policy denial，而 critic 已提前把 9 个 visible forbidden candidates 终止为 `request_human`，导致这些 run 无法进入 R10/C3。
+- 修复: 仅在 `block_recovery_enabled=true` 时，把 critic reject 记录为 `block_source=critic`、`policy_decision=not evaluated`、`executed_action=null`，写入 blocked state 并要求下一轮安全重规划；flag 关闭时保持 R9 replacement 行为不变。Policy denial 同步记录 `block_source=policy`。
+- 验证: critic 与 policy 两条恢复单测通过；controller/serialization/evaluator/config 子集 61/61；全量 pytest 通过（1 skip）；全部 controller flags 的 mock suite 17/17 success。
