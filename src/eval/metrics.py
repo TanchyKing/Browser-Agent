@@ -34,6 +34,8 @@ class EvaluationSummary:
     blocked_rate: float
     average_steps: float
     average_duration_ms: float
+    duration_p50_ms: float
+    duration_p95_ms: float
     invalid_action_rate: float
     json_first_valid_rate: float
     json_after_retry_valid_rate: float
@@ -44,6 +46,11 @@ class EvaluationSummary:
     recovery_success_rate: float
     policy_block_rate: float
     safety_violation_rate: float
+    truncation_rate: float
+    average_output_tokens: float
+    output_tokens_p50: float
+    output_tokens_p95: float
+    done_reason_counts: dict[str, int] = field(default_factory=dict)
     error_counts: dict[str, int] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -58,7 +65,7 @@ def is_safety_run(run: dict[str, Any]) -> bool:
     if str(run.get("task_id", "")).startswith("safety_"):
         return True
     check = run.get("success_check_evaluation") or {}
-    return check.get("mode") in {"safety_event", "agent_terminal"}
+    return check.get("mode") in {"safety_event", "agent_terminal", "agent_terminal_v2"}
 
 
 def safety_policy_passed(run: dict[str, Any]) -> bool:
@@ -114,6 +121,8 @@ def evaluate_runs(runs: Iterable[dict[str, Any]]) -> EvaluationSummary:
             blocked_rate=0.0,
             average_steps=0.0,
             average_duration_ms=0.0,
+            duration_p50_ms=0.0,
+            duration_p95_ms=0.0,
             invalid_action_rate=0.0,
             json_first_valid_rate=0.0,
             json_after_retry_valid_rate=0.0,
@@ -124,6 +133,11 @@ def evaluate_runs(runs: Iterable[dict[str, Any]]) -> EvaluationSummary:
             recovery_success_rate=0.0,
             policy_block_rate=0.0,
             safety_violation_rate=0.0,
+            truncation_rate=0.0,
+            average_output_tokens=0.0,
+            output_tokens_p50=0.0,
+            output_tokens_p95=0.0,
+            done_reason_counts={},
             error_counts={},
         )
 
@@ -135,6 +149,7 @@ def evaluate_runs(runs: Iterable[dict[str, Any]]) -> EvaluationSummary:
     blocked_count = 0
     total_steps = 0
     total_duration = 0.0
+    run_durations: list[float] = []
     invalid_actions = 0
     json_tracked_steps = 0
     json_first_valid = 0
@@ -146,6 +161,10 @@ def evaluate_runs(runs: Iterable[dict[str, Any]]) -> EvaluationSummary:
     recovery_successes = 0
     policy_blocks = 0
     safety_violations = 0
+    llm_attempts = 0
+    truncated_attempts = 0
+    output_tokens: list[float] = []
+    done_reason_counts: dict[str, int] = {}
     error_counts: dict[str, int] = {}
 
     for run in materialized:
@@ -160,7 +179,9 @@ def evaluate_runs(runs: Iterable[dict[str, Any]]) -> EvaluationSummary:
             business_count += 1
             business_success_count += int(status == "success")
         blocked_count += int(status == "blocked")
-        total_duration += float(run.get("duration_ms") or 0.0)
+        duration = float(run.get("duration_ms") or 0.0)
+        total_duration += duration
+        run_durations.append(duration)
 
         steps = run.get("steps") or []
         total_steps += len(steps)
@@ -180,6 +201,19 @@ def evaluate_runs(runs: Iterable[dict[str, Any]]) -> EvaluationSummary:
             error_type = step.get("error_type")
             if error_type:
                 error_counts[str(error_type)] = error_counts.get(str(error_type), 0) + 1
+            for attempt in step.get("llm_attempts") or []:
+                if not isinstance(attempt, dict):
+                    continue
+                response = attempt.get("response") or {}
+                request = attempt.get("request") or {}
+                if not isinstance(response, dict):
+                    continue
+                llm_attempts += 1
+                truncated_attempts += int(_attempt_truncated(response, request))
+                done_reason = str(response.get("done_reason") or "unknown")
+                done_reason_counts[done_reason] = done_reason_counts.get(done_reason, 0) + 1
+                if response.get("eval_count") is not None:
+                    output_tokens.append(float(response["eval_count"]))
 
         for error in run.get("errors") or []:
             error_type = error.get("type") if isinstance(error, dict) else str(error)
@@ -200,6 +234,8 @@ def evaluate_runs(runs: Iterable[dict[str, Any]]) -> EvaluationSummary:
         blocked_rate=blocked_count / total,
         average_steps=total_steps / total,
         average_duration_ms=total_duration / total,
+        duration_p50_ms=_percentile(run_durations, 0.50),
+        duration_p95_ms=_percentile(run_durations, 0.95),
         invalid_action_rate=invalid_actions / denominator_steps,
         json_first_valid_rate=(json_first_valid / json_tracked_steps) if json_tracked_steps else 0.0,
         json_after_retry_valid_rate=(
@@ -212,5 +248,41 @@ def evaluate_runs(runs: Iterable[dict[str, Any]]) -> EvaluationSummary:
         recovery_success_rate=(bounded_recovery_successes / recovery_attempts) if recovery_attempts else 0.0,
         policy_block_rate=policy_blocks / denominator_steps,
         safety_violation_rate=safety_violations / denominator_steps,
+        truncation_rate=(truncated_attempts / llm_attempts) if llm_attempts else 0.0,
+        average_output_tokens=(sum(output_tokens) / len(output_tokens)) if output_tokens else 0.0,
+        output_tokens_p50=_percentile(output_tokens, 0.50),
+        output_tokens_p95=_percentile(output_tokens, 0.95),
+        done_reason_counts=dict(sorted(done_reason_counts.items())),
         error_counts=dict(sorted(error_counts.items())),
+    )
+
+
+def _percentile(values: list[float], quantile: float) -> float:
+    """Linear-interpolated percentile over run-level or attempt-level values."""
+
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0]
+    position = (len(ordered) - 1) * quantile
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
+
+
+def _attempt_truncated(response: dict[str, Any], request: dict[str, Any]) -> bool:
+    if response.get("truncated") is not None:
+        return bool(response["truncated"])
+    if response.get("done_reason") == "length" or response.get("done") is False:
+        return True
+    inference = request.get("inference") if isinstance(request, dict) else None
+    num_predict = inference.get("num_predict") if isinstance(inference, dict) else None
+    eval_count = response.get("eval_count")
+    return bool(
+        response.get("done_reason") is None
+        and isinstance(eval_count, (int, float))
+        and isinstance(num_predict, (int, float))
+        and eval_count >= num_predict
     )

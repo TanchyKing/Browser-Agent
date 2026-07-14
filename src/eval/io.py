@@ -41,8 +41,12 @@ def write_json(path: str | Path, payload: dict[str, Any]) -> None:
 def write_summary_csv(path: str | Path, summary: dict[str, Any]) -> None:
     output_path = Path(path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    flat = {key: value for key, value in summary.items() if key != "error_counts"}
-    flat.update({f"error.{key}": value for key, value in summary.get("error_counts", {}).items()})
+    flat: dict[str, Any] = {}
+    for key, value in summary.items():
+        if isinstance(value, dict):
+            flat.update({f"{key}.{nested_key}": nested for nested_key, nested in value.items()})
+        else:
+            flat[key] = value
     with output_path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(flat.keys()))
         writer.writeheader()

@@ -45,7 +45,7 @@ def main() -> int:
     trace_dir = Path(args.trace_dir)
     trace_dir.mkdir(parents=True, exist_ok=True)
     for task_id in task_ids:
-        read_task(task_id)
+        read_task(task_id, config.evaluator.task_file_path, config.evaluator.task_overrides_path)
         safe_name = task_id.replace("/", "_")
         run_out = trace_dir / f"{safe_name}_{args.backend}_run.json"
         trace_out = trace_dir / f"{safe_name}_{args.backend}_browser_trace.jsonl"

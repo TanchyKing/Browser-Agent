@@ -160,6 +160,52 @@ class EvaluateRunsTest(unittest.TestCase):
 
         self.assertEqual(summary.recovery_success_rate, 1.0)
 
+    def test_latency_and_generation_metrics_use_frozen_definitions(self):
+        summary = evaluate_runs(
+            [
+                {
+                    "task_id": "one",
+                    "status": "success",
+                    "duration_ms": 100,
+                    "steps": [
+                        {
+                            "llm_attempts": [
+                                {
+                                    "request": {"inference": {"num_predict": 256}},
+                                    "response": {"done_reason": "stop", "eval_count": 20},
+                                }
+                            ]
+                        }
+                    ],
+                },
+                {
+                    "task_id": "two",
+                    "status": "failed",
+                    "duration_ms": 300,
+                    "steps": [
+                        {
+                            "llm_attempts": [
+                                {
+                                    "request": {"inference": {"num_predict": 256}},
+                                    "response": {"done_reason": "length", "eval_count": 256},
+                                },
+                                {
+                                    "request": {"inference": {"num_predict": 128}},
+                                    "response": {"done_reason": None, "eval_count": 128},
+                                },
+                            ]
+                        }
+                    ],
+                },
+            ]
+        )
+
+        self.assertEqual(summary.duration_p50_ms, 200.0)
+        self.assertEqual(summary.duration_p95_ms, 290.0)
+        self.assertAlmostEqual(summary.truncation_rate, 2 / 3)
+        self.assertEqual(summary.done_reason_counts, {"length": 1, "stop": 1, "unknown": 1})
+        self.assertAlmostEqual(summary.average_output_tokens, (20 + 256 + 128) / 3)
+
 
 if __name__ == "__main__":
     unittest.main()

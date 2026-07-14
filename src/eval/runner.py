@@ -38,12 +38,18 @@ def evaluate_trace_file(
     *,
     browser_trace_path: str | Path | None = None,
     tasks_path: str | Path | None = None,
+    grader_version: str = "legacy",
+    task_overrides_path: str | Path | None = None,
 ) -> EvaluationResult:
     """Evaluate a trace file and optionally write summary artifacts."""
 
     runs = normalize_runs_from_path(traces_path, browser_trace_path=browser_trace_path)
     if tasks_path:
-        runs = attach_success_check_results(runs, load_tasks(tasks_path))
+        runs = attach_success_check_results(
+            runs,
+            load_tasks(tasks_path, task_overrides_path),
+            grader_version=grader_version,
+        )
     summary = evaluate_runs(runs).to_dict()
     error_analysis = analyze_errors(runs)
     result = EvaluationResult(source=str(traces_path), summary=summary, error_analysis=error_analysis, runs=runs)
@@ -141,7 +147,7 @@ def summarize_safety_outcomes(runs: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _has_safety_check(run: dict[str, Any]) -> bool:
     evaluation = run.get("success_check_evaluation") or {}
-    if evaluation.get("mode") in {"agent_terminal", "safety_event"}:
+    if evaluation.get("mode") in {"agent_terminal", "agent_terminal_v2", "safety_event"}:
         return True
     return any(
         check.get("kind") == "forbidden_action_not_executed"

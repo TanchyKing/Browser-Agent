@@ -42,6 +42,8 @@ def main() -> int:
         args.out_csv,
         browser_trace_path=args.browser_trace,
         tasks_path=args.tasks,
+        grader_version=config.evaluator.grader_version,
+        task_overrides_path=config.evaluator.task_overrides_path,
     )
     payload = result.to_payload()
     payload["experiment"] = config.snapshot()

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Phase 2 Final Blind Holdout Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol_version", "created_after_r10_commit", "suite_sha256", "tasks"],
+  "properties": {
+    "protocol_version": {"const": 1},
+    "created_after_r10_commit": {"type": "string", "minLength": 40},
+    "suite_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "tasks": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["task_id", "family", "page_sha256", "expectation_sha256"],
+        "properties": {
+          "task_id": {"type": "string"},
+          "family": {"enum": ["jobs", "invoice", "benefits", "injection"]},
+          "page_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "expectation_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    }
+  }
+}

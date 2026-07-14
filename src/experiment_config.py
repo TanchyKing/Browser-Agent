@@ -66,13 +66,34 @@ class LoggingConfig:
 
 
 @dataclass(frozen=True)
+class EvaluatorConfig:
+    grader_version: str = "legacy"
+    task_file_path: str = "tasks/offline_tasks.jsonl"
+    task_overrides_path: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.grader_version not in {"legacy", "v2"}:
+            raise ValueError("evaluator.grader_version must be 'legacy' or 'v2'")
+
+
+@dataclass(frozen=True)
+class PromptConfig:
+    mode: str = "legacy"
+
+    def __post_init__(self) -> None:
+        if self.mode not in {"legacy", "contract"}:
+            raise ValueError("prompt.mode must be 'legacy' or 'contract'")
+
+
+@dataclass(frozen=True)
 class ExperimentConfig:
     version: int = 1
     experiment_id: str = "phase2-r1-legacy"
     inference: InferenceConfig = field(default_factory=InferenceConfig)
     runner: RunnerConfig = field(default_factory=RunnerConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
-    evaluator: dict[str, Any] = field(default_factory=lambda: {"grader_version": "legacy"})
+    evaluator: EvaluatorConfig = field(default_factory=EvaluatorConfig)
+    prompt: PromptConfig = field(default_factory=PromptConfig)
     controller: dict[str, Any] = field(default_factory=lambda: {"enabled": False})
     source_path: str | None = field(default=None, compare=False)
 
@@ -90,6 +111,7 @@ class ExperimentConfig:
             "runner",
             "logging",
             "evaluator",
+            "prompt",
             "controller",
         }
         unknown = sorted(set(payload) - allowed)
@@ -101,7 +123,8 @@ class ExperimentConfig:
             inference=InferenceConfig(**dict(payload.get("inference") or {})),
             runner=RunnerConfig(**dict(payload.get("runner") or {})),
             logging=LoggingConfig(**dict(payload.get("logging") or {})),
-            evaluator=dict(payload.get("evaluator") or {"grader_version": "legacy"}),
+            evaluator=EvaluatorConfig(**dict(payload.get("evaluator") or {})),
+            prompt=PromptConfig(**dict(payload.get("prompt") or {})),
             controller=dict(payload.get("controller") or {"enabled": False}),
             source_path=source_path,
         )

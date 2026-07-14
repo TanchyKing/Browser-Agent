@@ -92,6 +92,30 @@ class RunDemoHelperTests(unittest.TestCase):
         self.assertNotIn("abc123", safe["note"])
         self.assertNotIn("admin@example.com", safe["note"])
 
+    def test_contract_prompt_is_invariant_to_private_grader_sentinel(self):
+        base = {
+            "instruction": "Find Northstar Clinics.",
+            "allowed_actions": ["observe_page", "click", "finish"],
+            "success_check": {
+                "all_of": [{"kind": "element_text", "target": "#private-one", "value": "ORACLE_ONE"}]
+            },
+        }
+        mutated = {
+            **base,
+            "success_check": {
+                "all_of": [{"kind": "download_name", "target": "private", "value": "SENTINEL_FILE.csv"}]
+            },
+        }
+
+        first = format_task_prompt(base, "contract")
+        second = format_task_prompt(mutated, "contract")
+
+        self.assertEqual(first, second)
+        self.assertNotIn("#private-one", first)
+        self.assertNotIn("ORACLE_ONE", first)
+        self.assertNotIn("SENTINEL_FILE.csv", second)
+        self.assertIn("Northstar Clinics", first)
+
 
 if __name__ == "__main__":
     unittest.main()

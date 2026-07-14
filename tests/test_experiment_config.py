@@ -49,6 +49,14 @@ class ExperimentConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "duplicate"):
                 load_suite_manifest(path)
 
+    def test_r2_switches_grader_and_prompt_without_changing_inference_defaults(self):
+        config = load_experiment_config(ROOT / "configs" / "phase2" / "r2_fixed_grader.yaml")
+
+        self.assertEqual(config.evaluator.grader_version, "v2")
+        self.assertEqual(config.prompt.mode, "contract")
+        self.assertEqual(config.inference.model_name, "qwen3:8b")
+        self.assertEqual(config.inference.format_mode, "json")
+
 
 if __name__ == "__main__":
     unittest.main()
