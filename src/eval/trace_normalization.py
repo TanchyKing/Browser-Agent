@@ -86,18 +86,30 @@ def merge_browser_trace_steps(run: dict[str, Any], browser_records: list[dict[st
             merged.setdefault("status", "failed")
         return merged
 
-    browser_by_step_index = {
-        step.get("step_index"): step
-        for step in browser_steps
-        if step.get("step_index") is not None
-    }
-    for idx, existing in enumerate(existing_steps):
+    used_browser_steps: set[int] = set()
+    for existing in existing_steps:
         step_index = existing.get("step_index")
-        browser = browser_by_step_index.get(step_index)
-        if browser is None:
-            browser = browser_steps[idx] if step_index is None and idx < len(browser_steps) else None
+        preferred = [
+            idx
+            for idx, browser_step in enumerate(browser_steps)
+            if idx not in used_browser_steps and browser_step.get("step_index") == step_index
+        ]
+        remaining = [
+            idx for idx in range(len(browser_steps))
+            if idx not in used_browser_steps and idx not in preferred
+        ]
+        browser_index = next(
+            (
+                idx
+                for idx in [*preferred, *remaining]
+                if _browser_step_matches(existing, browser_steps[idx])
+            ),
+            None,
+        )
+        browser = browser_steps[browser_index] if browser_index is not None else None
         if browser is None:
             continue
+        used_browser_steps.add(browser_index)
         if "execution_ok" in browser:
             existing["execution_ok"] = browser.get("execution_ok")
         if browser.get("policy_blocked"):
@@ -114,6 +126,20 @@ def merge_browser_trace_steps(run: dict[str, Any], browser_records: list[dict[st
             existing["extracted_text"] = browser["extracted_text"]
     merged["steps"] = existing_steps
     return merged
+
+
+def _browser_step_matches(existing_step: dict[str, Any], browser_step: dict[str, Any]) -> bool:
+    if str(existing_step.get("action_type") or "") != str(browser_step.get("action_type") or ""):
+        return False
+    existing_target = existing_step.get("target") or existing_step.get("selector")
+    browser_target = browser_step.get("selector")
+    if existing_target and browser_target:
+        return _normalize_selector(str(existing_target)) == _normalize_selector(str(browser_target))
+    return True
+
+
+def _normalize_selector(value: str) -> str:
+    return value.strip().replace('"', "'")
 
 
 def _browser_error_should_override(existing_step: dict[str, Any]) -> bool:

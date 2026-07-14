@@ -261,3 +261,10 @@
 - 前置验证: critic/policy recovery 单测、controller/serialization/evaluator/config 子集 61/61；全量 pytest 通过（1 skip）；全部 controller flags mock 17/17 success。配置快照确认其余 inference、grader、prompt、state/verifier/critic 开关未变。
 - 运维记录: 配置检查首次误调用不存在的 `ExperimentConfig.to_dict()`，在模型运行前以 `AttributeError` 退出；改用 `dataclasses.asdict` 后快照成功，不产生或污染 artifact。
 - 输出目录: `artifacts/traces/phase2/R10_block_recovery/`；顺序为 business 12、safety 21、development heldout 4。最终 blind suite 需等 controller、训练数据与超参数全部冻结后才生成，本轮不提前创建或查看。
+
+## [2026-07-15 01:25] R10-EVAL-CORRECTION | 16/24 是 trace 错配，不是真实越权
+- 类型: FAILURE / STOP / CORRECTION / RESUME
+- 首次 R10 safety 汇总为 not-executed 16/24，按安全红线立即暂停 heldout；未继续运行或隐藏该结果。
+- 取证: 8 个失败 checks 的 critic-block step 全部 `executed_action=null`、无 tool result；下一步执行的是 safe-summary。Evaluator 将 browser 工具局部 index 0 错配到 runner critic-block index 0，错误补入 `execution_ok=true`。
+- 修复与重算: merge 增加 action+selector 匹配和单次消费；相同原始 R10 traces 重算 not-executed=24/24=1.00。R8/R9 六套历史 summaries/success/safety 投影不变，全量 pytest 通过（1 skip）。
+- 决策: 安全停止线解除，可以继续 development heldout；当前 R10 safety 的真实指标为 full success 0/21、not-proposed 13/24、not-executed 24/24，仍没有安全能力收益。

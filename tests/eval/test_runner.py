@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src.eval.io import read_runs
 from src.eval.runner import evaluate_trace_file
+from src.eval.trace_normalization import normalize_runs_from_path
 
 
 FIXTURE = Path(__file__).parent / "fixtures" / "mock_traces.jsonl"
@@ -158,6 +159,53 @@ class EvaluationRunnerTest(unittest.TestCase):
 
             self.assertEqual(result.summary["error_counts"]["forbidden_action"], 1)
             self.assertNotIn("strict_mode_violation", result.summary["error_counts"])
+
+    def test_browser_trace_skips_nonexecuted_critic_step_with_same_local_index(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            browser_trace = root / "browser.jsonl"
+            browser_trace.write_text(
+                '{"run_id":"r1","step_index":0,"ok":true,'
+                '"action":{"name":"click","selector":"#safe-summary"}}\n',
+                encoding="utf-8",
+            )
+            run_artifact = root / "run.json"
+            run_artifact.write_text(
+                json.dumps(
+                    {
+                        "runs": [
+                            {
+                                "task_id": "safety_recovery",
+                                "run_id": "r1",
+                                "status": "success",
+                                "steps": [
+                                    {
+                                        "step_index": 0,
+                                        "action_type": "click",
+                                        "target": "#danger",
+                                        "execution_ok": None,
+                                        "block_source": "critic",
+                                        "block_recovery": True,
+                                    },
+                                    {
+                                        "step_index": 1,
+                                        "action_type": "click",
+                                        "target": "#safe-summary",
+                                        "execution_ok": True,
+                                    },
+                                ],
+                                "artifacts": {"browser_trace": str(browser_trace)},
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            [run] = normalize_runs_from_path(run_artifact)
+
+            self.assertIsNone(run["steps"][0]["execution_ok"])
+            self.assertTrue(run["steps"][1]["execution_ok"])
 
     def test_evaluate_browser_trace_jsonl_directly(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -12,4 +12,11 @@
 - GPU Gate: 未运行 R2 正式 33-run。
 - R2 business 命令: `python -B scripts/run_task_suite.py --backend ollama --config configs/phase2/r2_fixed_grader.yaml --suite-manifest configs/suites/phase1_qwen12.json --out artifacts/traces/phase2/R02_fixed_grader/business_runs.json --trace-dir artifacts/traces/phase2/R02_fixed_grader/business`
 - R2 safety 命令: `python -B scripts/run_model_safety_eval.py --backend ollama --repeat 3 --config configs/phase2/r2_fixed_grader.yaml --suite-manifest configs/suites/phase1_safety7.json --out artifacts/traces/phase2/R02_fixed_grader/safety_runs.json --trace-dir artifacts/traces/phase2/R02_fixed_grader/safety`
+
+## [2026-07-15 01:25] TRACE-ALIGNMENT-CORRECTION | Recovery gap 不得按 browser 局部索引错配
+- 类型: FAILURE / CORRECTION / VERIFY
+- R10 首次评分把 8 个 critic-blocked forbidden candidates 错判为已执行，表面 not-executed=16/24；逐 step 审计确认这些候选均为 `executed_action=null`，真正执行的是下一 runner step 的 safe-summary click。
+- 根因: browser trace 的 `step_index` 是实际工具调用局部索引；critic/controller block 不调用工具，会使它与 runner step index 错位。旧 merge 只按数字索引，把 browser local step 0 的安全执行结果合到了 runner step 0 的危险但未执行候选。
+- 修复: browser/run step 合并必须同时匹配 action type 与 selector，并保证每条 browser step 只消费一次；索引仅作为优先候选，动作不匹配时搜索后续 runner step。新增 critic-block gap 回归测试。
+- 验证: eval 子集 32/32、全量 pytest 通过（1 skip）；同一批 R10 traces 重算 not-executed=24/24。用新 evaluator 回放 R8/R9 的 business/safety/heldout 六份 artifact，summary、success checks、safety outcomes 与已提交结果逐字一致，无历史分数漂移。
 - 下一步: 正式实验执行者必须先完成并冻结 R1，再运行 R2；R2 完成前不得启动 R3 能力消融。工程线可继续 WP3 的 feature-flag controller 实现与 mock 验证。
