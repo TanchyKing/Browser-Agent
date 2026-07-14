@@ -214,3 +214,18 @@
 - Development heldout: overall 1/4、业务 1/3；`heldout_invoice_platform_ops` 6 步成功，是 Phase 2 controller 的首条开发变体成功。jobs/benefits 仍因缺 target 结构错误失败，injection 仍被 policy block。
 - Leak 验证: copy 在无预填答案后 4 步失败，未完成目标页状态；旧 R7 的 copy success 已证实不能使用。R7b 初始 artifact/config/task contract 均不含隐藏 `PX-4172`。
 - 判定: AgentState 有小幅真实 business 收益、显著减少平均步数并出现 1 条 heldout 泛化，且没有进一步恶化 R6 安全指标；格式稳定性仍明显退化。可进入 R8，正式对照见 `artifacts/traces/phase2/R06_R07b_comparison.md`。
+
+## [2026-07-15 00:50] R8-RESTART | Completion verifier on R7b
+- 类型: EXPERIMENT RESTART
+- 有效 parent/code commit: `f091def`；`configs/phase2/r8_completion_verifier.yaml` 已改为继承 R7b，文件 SHA-256=`898C1CC557A0299528C4ADA4DA9450CBB6B28726806D3D8CE53D800F6DF27A21`。
+- 单变量: R7b 的无泄漏 AgentState + `completion_verifier_enabled=true`；repeat cooldown、trust partition、critic、block recovery 均关闭。
+- 审计: 旧 R8 只完成 business 后因 parent leak 作废，目录已清理；本次从空目录完整运行 12+21+4，不拼接。
+
+## [2026-07-15 00:58] R8-COMPLETE | 修复 inventory，但净成功率持平
+- 类型: EXPERIMENT COMPLETE
+- 完整性: business 12/12、safety 21/21、development heldout 4/4；有效 R8 三组 artifacts/reports 齐全，旧作废 attempt 未混入。
+- Business: 纯 business 4/10、supported checks 5/12，与 R7b 持平；平均 steps 3.50→3.58，p50 11267→12451.5 ms。first-valid JSON=0.7907，after-retry=0.9302，截断/transport error 为 0。
+- Verifier 因果: 共 4 个 controller-blocked candidates。Inventory 在 slots 完成后拒绝重复 select，下一步 finish，R7b 的 missing-finish 转成功。CRM 在 DOM 已选中但 contract 的 extraction slot pending 时拒绝 finish，随后缺 target invalid response，抵消该收益。Copy 两次 premature finish 因 code_read/code_entered pending 被正确拒绝。
+- Safety: 完整成功 0/21、forbidden 未提出 15/24、未执行 24/24，与 R7b 完全一致；逐任务步数也一致，确认无 required slots 时 verifier 不介入。
+- Development heldout: 1/4，invoice success 保留；状态、步数与 R7b 完全一致，只有运行时延变化。
+- 判定: verifier 对明确 missing-finish 有用，但 contract 欠/过约束与小模型纠错失败使总成功率无增益，并增加约 10.5% business p50。继续作为 R9 parent 以保持预注册累计矩阵，但不单独晋级。对照见 `artifacts/traces/phase2/R07b_R08_comparison.md`。
