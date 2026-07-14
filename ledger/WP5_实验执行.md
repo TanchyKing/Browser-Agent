@@ -91,3 +91,20 @@
 - Safety: 完整成功 0/21，forbidden 未执行 24/24、未提出 15/24=0.625，与 R3 相同；p50=3893 ms，JSON 100%、截断 0。error 层记录 12 次 policy/forbidden block，其中 safety outcome 的真实 forbidden targets 为 external-nav、credentials submit、bulk-destroy 各 3 次。
 - 判定: bounded schema 对格式与延迟有效，business 有小幅收益，但不能修复 think=false 引起的安全语义退化或多步 completion。可作为后续基础设施变量，不能单独晋级。
 - Gate: 进入 R5a/R5b/R5c，只改变 `num_predict` 为 128/256/768；R4 本身即 768 对照，但仍按冻结配置生成 R5c 独立 artifact，避免跨编号复用结果。
+
+## [2026-07-14 23:01] R5-START | `num_predict` 128/256/768
+- 类型: EXPERIMENT SERIES
+- 代码 commit: `54f49cf`；R5a/R5b/R5c 配置文件 SHA-256 分别为 `AD716A9D16355FF2B4F36058733F05DF7E6C888C29790EB9A7E0F77C332A07C8`、`BA88EC7B9C7D0DEE16FC7A9BE1B54EA8A67647E9E7A30F3BFDBDF58AB8BCC66A`、`06D043B0200FB26D660BA9ED67799A986290BC7DB1899B35E795916AE9948312`。
+- 单变量: 三组均继承 R4，只改变 `num_predict`；每组独立运行相同 12+21 条并生成自己的 artifact。
+- 顺序: R5a 128 → R5b 256 → R5c 768，单 GPU 串行；输出目录分别为 `R05a_num_predict_128`、`R05b_num_predict_256`、`R05c_num_predict_768`。
+
+## [2026-07-14 23:19] R5-COMPLETE / DECISION | 选择 `num_predict=128`
+- 类型: EXPERIMENT SERIES COMPLETE / DECISION
+- 完整性: 三档各自独立完成 business 12/12 + safety 21/21，共 99 runs；R5c 没有复用 R4 artifact。
+- 一致结果: 三档均为纯 business 2/10、supported pass 4/12、平均 5.25 steps、JSON 100%、截断 0；safety 均为完整成功 0/21、forbidden 未提出 15/24、未执行 24/24、JSON 100%、截断 0。
+- 行为复核: 去除 run id/时长/底层计时后，三档 task/status/terminal answer 与逐步 action/target/value/reason/risk/validation/execution/policy/error/requested-input 投影逐字一致。
+- 延迟: business p50 分别为 20402/20197/20193.5 ms，safety p50 为 3957/3941/3948 ms；差异不足以支持更大 cap。
+- 决策: 后续 R6–R10 以 R5a `num_predict=128` 为 parent。128 是最小无损 cap，所有 90 个模型 actions 都以 `done_reason=stop` 结束，没有 length。
+- 安全边界: cap 决策不是 capability gate；R5 safety 仍为 0/21，不能称为候选最终 agent。
+- 产物: 三个 R05 目录各含 combined runs、per-run traces、JSON/CSV summary 和 HTML report；横向表见 `artifacts/traces/phase2/R05_num_predict_comparison.md`。
+- 流程补正: 落地计划要求 R2 起运行 development held-out。R2–R5 的 4-task heldout 尚未正式执行，必须在 R6 前补齐并单列报告，不能用 visible 33-run 结果代替。
