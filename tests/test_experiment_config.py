@@ -57,6 +57,18 @@ class ExperimentConfigTests(unittest.TestCase):
         self.assertEqual(config.inference.model_name, "qwen3:8b")
         self.assertEqual(config.inference.format_mode, "json")
 
+    def test_ablation_config_inherits_parent_and_changes_only_declared_fields(self):
+        r3 = load_experiment_config(ROOT / "configs" / "phase2" / "r3_think_false.yaml")
+        r4 = load_experiment_config(ROOT / "configs" / "phase2" / "r4_bounded_schema.yaml")
+
+        self.assertFalse(r3.inference.think)
+        self.assertEqual(r3.inference.format_mode, "json")
+        self.assertEqual(r3.evaluator.grader_version, "v2")
+        self.assertFalse(r4.inference.think)
+        self.assertEqual(r4.inference.format_mode, "schema")
+        self.assertTrue(r4.inference.structured_validation)
+        self.assertEqual(r4.inference.num_predict, 768)
+
 
 if __name__ == "__main__":
     unittest.main()

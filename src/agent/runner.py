@@ -13,7 +13,11 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from src.agent.actions import AgentAction
+from src.agent.critic import review_action
 from src.agent.safety import SafetyDecision, SafetyPolicy
+from src.agent.state import AgentState, action_to_mapping
+from src.agent.trust import partition_observation
+from src.agent.verifier import verify_candidate
 from src.llm import (
     BaseLLMAdapter,
     LLMRequest,
@@ -22,6 +26,7 @@ from src.llm import (
     observation_grounded_schema,
     validate_structured_action,
 )
+from src.task_contract import TaskContract
 
 
 class BrowserTools(Protocol):
@@ -68,6 +73,15 @@ class BrowserAgentRunner:
         structured_validation: bool = False,
         dynamic_selector_enum: bool = False,
         retry_prompt_mode: str = "legacy",
+        task_contract: TaskContract | None = None,
+        controller_enabled: bool = False,
+        state_enabled: bool = False,
+        completion_verifier_enabled: bool = False,
+        repeat_cooldown_enabled: bool = False,
+        trust_partition_enabled: bool = False,
+        critic_enabled: bool = False,
+        block_recovery_enabled: bool = False,
+        max_consecutive_blocks: int = 2,
     ) -> None:
         if max_steps < 1:
             raise ValueError("max_steps must be >= 1")
@@ -91,6 +105,15 @@ class BrowserAgentRunner:
         self.structured_validation = structured_validation
         self.dynamic_selector_enum = dynamic_selector_enum
         self.retry_prompt_mode = retry_prompt_mode
+        self.task_contract = task_contract
+        self.controller_enabled = controller_enabled
+        self.state_enabled = controller_enabled and state_enabled
+        self.completion_verifier_enabled = controller_enabled and completion_verifier_enabled
+        self.repeat_cooldown_enabled = controller_enabled and repeat_cooldown_enabled
+        self.trust_partition_enabled = controller_enabled and trust_partition_enabled
+        self.critic_enabled = controller_enabled and critic_enabled
+        self.block_recovery_enabled = controller_enabled and block_recovery_enabled
+        self.max_consecutive_blocks = max_consecutive_blocks
 
     def run(self, task: str) -> AgentRunResult:
         steps: list[AgentStep] = []
@@ -99,9 +122,29 @@ class BrowserAgentRunner:
         last_successful_action: tuple[str, str | None, str | int | float | bool | None] | None = None
         repeated_successful_actions = 0
         repeat_feedbacks = 0
+        consecutive_blocks = 0
+        state = (
+            AgentState.from_contract(self.task_contract, step_budget=self.max_steps)
+            if self.state_enabled and self.task_contract is not None
+            else None
+        )
         for step_index in range(self.max_steps):
             base_observation = self.tools.observe_page()
-            observation = _with_recovery_context(base_observation, recovery_context)
+            if state is not None:
+                state.observe(base_observation)
+            model_observation = (
+                partition_observation(base_observation)
+                if self.trust_partition_enabled
+                else base_observation
+            )
+            if state is not None:
+                model_observation = (
+                    model_observation
+                    + "\n\n[AGENT_STATE]\n"
+                    + json.dumps(state.snapshot(), ensure_ascii=False, sort_keys=True)
+                )
+            observation = _with_recovery_context(model_observation, recovery_context)
+            state_before = state.snapshot() if state is not None else None
             action, llm_result, observation = self._complete_action(task, observation, step_index)
             if action is None:
                 steps.append(
@@ -116,13 +159,69 @@ class BrowserAgentRunner:
                 )
                 return AgentRunResult(False, None, tuple(steps))
 
+            decision_trace: dict[str, Any] | None = None
+            original_action = action
+            if self.critic_enabled:
+                critic = review_action(action, forbidden_actions=self.forbidden_actions)
+                decision_trace = critic.audit(action)
+                if not critic.allowed and critic.replacement is not None:
+                    action = critic.replacement
+
+            if state is not None and (self.completion_verifier_enabled or self.repeat_cooldown_enabled):
+                verification = verify_candidate(action, state)
+                if not verification.allowed:
+                    result = _with_llm_result(
+                        {
+                            "controller_blocked": True,
+                            "controller_reason": verification.reason,
+                            "state_before": state_before,
+                            "state_after": state.snapshot(),
+                            "decision_trace": decision_trace,
+                        },
+                        llm_result,
+                    )
+                    steps.append(
+                        AgentStep(
+                            step_index=step_index,
+                            observation=observation,
+                            action=action,
+                            safety=SafetyDecision(True, False, "controller requested replanning"),
+                            result=result,
+                            error=verification.reason,
+                            recovery_attempt=True,
+                        )
+                    )
+                    recovery_context = verification.reason + ". Re-observe and choose a different safe action."
+                    continue
+
             safety = self.safety_policy.evaluate(
                 action,
                 page_text=base_observation,
                 forbidden_actions=self.forbidden_actions,
             )
+            if decision_trace is not None:
+                decision_trace["policy_decision"] = {
+                    "allowed": safety.allowed,
+                    "requires_human": safety.requires_human,
+                    "reason": safety.reason,
+                }
             if not safety.allowed:
-                result = _with_llm_result({}, llm_result)
+                if state is not None:
+                    state.add_blocked(original_action, safety.reason)
+                consecutive_blocks += 1
+                should_recover_block = (
+                    self.block_recovery_enabled
+                    and consecutive_blocks < self.max_consecutive_blocks
+                )
+                result = _with_llm_result(
+                    {
+                        "decision_trace": decision_trace,
+                        "state_before": state_before,
+                        "state_after": state.snapshot() if state is not None else None,
+                        "block_recovery": should_recover_block,
+                    },
+                    llm_result,
+                )
                 steps.append(
                     AgentStep(
                         step_index=step_index,
@@ -131,12 +230,26 @@ class BrowserAgentRunner:
                         safety=safety,
                         result=result,
                         error=safety.reason,
+                        recovery_attempt=should_recover_block,
                     )
                 )
+                if should_recover_block:
+                    recovery_context = _format_policy_block_context(original_action, safety.reason)
+                    continue
                 return AgentRunResult(False, action.action, tuple(steps))
 
+            consecutive_blocks = 0
+
             if action.is_terminal:
-                result = _with_llm_result({"terminal": action.action}, llm_result)
+                result = _with_llm_result(
+                    {
+                        "terminal": action.action,
+                        "decision_trace": decision_trace,
+                        "state_before": state_before,
+                        "state_after": state.snapshot() if state is not None else None,
+                    },
+                    llm_result,
+                )
                 if action.action == "request_human":
                     result.update(
                         {
@@ -164,6 +277,13 @@ class BrowserAgentRunner:
                     {"ok": False, "error": str(exc), "error_type": type(exc).__name__},
                     llm_result,
                 )
+            if state is not None:
+                state.record_result(action, result, observation=base_observation)
+            result["state_before"] = state_before
+            result["state_after"] = state.snapshot() if state is not None else None
+            result["decision_trace"] = decision_trace
+            if decision_trace is not None:
+                decision_trace["executed_action"] = action_to_mapping(action)
 
             error = _execution_error(result)
             is_recoverable = error is not None and _is_recoverable_error(error)
@@ -210,6 +330,9 @@ class BrowserAgentRunner:
                 repeated_successful_actions >= 2
                 and repeat_feedbacks < self.max_recovery_attempts
             ):
+                if state is not None and self.repeat_cooldown_enabled:
+                    state.cooldown_actions.add(_action_signature(action))
+                    result["state_after"] = state.snapshot()
                 repeat_feedbacks += 1
                 recovery_context = _format_repeat_context(action, repeated_successful_actions, repeat_feedbacks)
                 continue
@@ -434,6 +557,18 @@ def _format_repeat_context(action: AgentAction, repeat_count: int, feedback_coun
         f"repeat_count={repeat_count}",
     ]
     return "\n".join(piece for piece in pieces if piece)
+
+
+def _format_policy_block_context(action: AgentAction, reason: str) -> str:
+    return "\n".join(
+        [
+            "The previous candidate was blocked by the hard safety policy.",
+            f"blocked_action={action.action}",
+            f"blocked_target={action.target}",
+            f"block_reason={reason}",
+            "Choose a safe alternative grounded in the user task. Do not repeat the blocked target.",
+        ]
+    )
 
 
 def _format_success_context(action: AgentAction, result: dict[str, Any]) -> str | None:

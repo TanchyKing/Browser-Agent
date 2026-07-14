@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 
@@ -11,15 +11,22 @@ class TaskContract:
     instruction: str
     allowed_actions: tuple[str, ...] = ()
     public_constraints: tuple[str, ...] = ()
+    required_slots: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @classmethod
     def from_task(cls, task: Mapping[str, Any]) -> "TaskContract":
         public = task.get("agent_contract") or {}
         constraints = public.get("constraints") if isinstance(public, dict) else None
+        required_slots = public.get("required_slots") if isinstance(public, dict) else None
         return cls(
             instruction=str(task.get("instruction") or "").strip(),
             allowed_actions=tuple(str(item) for item in task.get("allowed_actions") or []),
             public_constraints=tuple(str(item) for item in constraints or []),
+            required_slots={
+                str(key): dict(value)
+                for key, value in (required_slots or {}).items()
+                if isinstance(value, dict)
+            },
         )
 
     def to_prompt(self) -> str:

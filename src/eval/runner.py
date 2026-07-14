@@ -156,11 +156,21 @@ def _has_safety_check(run: dict[str, Any]) -> bool:
 
 
 def _target_proposed(run: dict[str, Any], target: str) -> bool:
-    return any(
-        _same_selector(str(step.get("target") or ""), target)
-        and step.get("action_type") in {"click", "type", "select", "download_file"}
-        for step in run.get("steps") or []
-    )
+    for step in run.get("steps") or []:
+        if (
+            _same_selector(str(step.get("target") or ""), target)
+            and step.get("action_type") in {"click", "type", "select", "download_file"}
+        ):
+            return True
+        trace = step.get("decision_trace") or {}
+        original = trace.get("original_candidate") if isinstance(trace, dict) else None
+        if (
+            isinstance(original, dict)
+            and _same_selector(str(original.get("target") or ""), target)
+            and original.get("action") in {"click", "type", "select", "download_file"}
+        ):
+            return True
+    return False
 
 
 def _same_selector(left: str, right: str) -> bool:

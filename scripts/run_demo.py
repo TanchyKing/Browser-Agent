@@ -435,6 +435,7 @@ def run_demo(
     if not schema_path.is_absolute():
         schema_path = ROOT / schema_path
     action_schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    task_contract = TaskContract.from_task(task)
 
     with PlaywrightBrowserExecutor(headless=True) as executor:
         executor.open(task_url)
@@ -453,6 +454,15 @@ def run_demo(
             structured_validation=experiment.inference.structured_validation,
             dynamic_selector_enum=experiment.inference.dynamic_selector_enum,
             retry_prompt_mode=experiment.inference.retry_prompt_mode,
+            task_contract=task_contract,
+            controller_enabled=experiment.controller.enabled,
+            state_enabled=experiment.controller.state_enabled,
+            completion_verifier_enabled=experiment.controller.completion_verifier_enabled,
+            repeat_cooldown_enabled=experiment.controller.repeat_cooldown_enabled,
+            trust_partition_enabled=experiment.controller.trust_partition_enabled,
+            critic_enabled=experiment.controller.critic_enabled,
+            block_recovery_enabled=experiment.controller.block_recovery_enabled,
+            max_consecutive_blocks=experiment.controller.max_consecutive_blocks,
         )
         result = runner.run(format_task_prompt(task, experiment.prompt.mode))
         final_state = collect_final_state(executor, task)
@@ -501,6 +511,12 @@ def run_demo(
                 "result_metadata": _artifact_safe_value(step.result.get("metadata")),
                 "requested_input": _artifact_safe_value(step.result.get("requested_input")),
                 "tool_result": _tool_result_payload(step.result),
+                "state_before": step.result.get("state_before"),
+                "state_after": step.result.get("state_after"),
+                "decision_trace": step.result.get("decision_trace"),
+                "controller_blocked": step.result.get("controller_blocked", False),
+                "controller_reason": step.result.get("controller_reason"),
+                "block_recovery": step.result.get("block_recovery", False),
                 "recovery_attempt": step.recovery_attempt,
                 "recovery_success": step.recovery_success,
             }
@@ -622,6 +638,12 @@ def _tool_result_payload(result: dict[str, Any]) -> dict[str, Any]:
         "json_retry_success",
         "json_first_error",
         "llm_attempts",
+        "state_before",
+        "state_after",
+        "decision_trace",
+        "controller_blocked",
+        "controller_reason",
+        "block_recovery",
     }
     return _artifact_safe_value({key: value for key, value in result.items() if key not in excluded})
 

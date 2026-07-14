@@ -86,6 +86,22 @@ class PromptConfig:
 
 
 @dataclass(frozen=True)
+class ControllerConfig:
+    enabled: bool = False
+    state_enabled: bool = False
+    completion_verifier_enabled: bool = False
+    repeat_cooldown_enabled: bool = False
+    trust_partition_enabled: bool = False
+    critic_enabled: bool = False
+    block_recovery_enabled: bool = False
+    max_consecutive_blocks: int = 2
+
+    def __post_init__(self) -> None:
+        if self.max_consecutive_blocks < 1:
+            raise ValueError("controller.max_consecutive_blocks must be >= 1")
+
+
+@dataclass(frozen=True)
 class ExperimentConfig:
     version: int = 1
     experiment_id: str = "phase2-r1-legacy"
@@ -94,7 +110,7 @@ class ExperimentConfig:
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     evaluator: EvaluatorConfig = field(default_factory=EvaluatorConfig)
     prompt: PromptConfig = field(default_factory=PromptConfig)
-    controller: dict[str, Any] = field(default_factory=lambda: {"enabled": False})
+    controller: ControllerConfig = field(default_factory=ControllerConfig)
     source_path: str | None = field(default=None, compare=False)
 
     @classmethod
@@ -125,7 +141,7 @@ class ExperimentConfig:
             logging=LoggingConfig(**dict(payload.get("logging") or {})),
             evaluator=EvaluatorConfig(**dict(payload.get("evaluator") or {})),
             prompt=PromptConfig(**dict(payload.get("prompt") or {})),
-            controller=dict(payload.get("controller") or {"enabled": False}),
+            controller=ControllerConfig(**dict(payload.get("controller") or {})),
             source_path=source_path,
         )
 
@@ -186,6 +202,13 @@ def load_experiment_config(path: str | Path | None = None) -> ExperimentConfig:
         payload = {}
     if not isinstance(payload, dict):
         raise ValueError("Experiment config root must be a mapping")
+    extends = payload.pop("extends", None)
+    if extends:
+        parent_path = Path(str(extends))
+        if not parent_path.is_absolute():
+            parent_path = config_path.parent / parent_path
+        parent = load_experiment_config(parent_path).values()
+        payload = _deep_merge(parent, payload)
     return ExperimentConfig.from_mapping(payload, source_path=str(config_path))
 
 
@@ -208,3 +231,13 @@ def load_suite_manifest(path: str | Path) -> SuiteManifest:
         source_path=str(manifest_path),
         sha256=hashlib.sha256(raw).hexdigest(),
     )
+
+
+def _deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, Mapping) and isinstance(merged.get(key), Mapping):
+            merged[key] = _deep_merge(merged[key], value)  # type: ignore[arg-type]
+        else:
+            merged[key] = value
+    return merged
