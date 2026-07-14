@@ -13,7 +13,7 @@
 - R2 business 命令: `python -B scripts/run_task_suite.py --backend ollama --config configs/phase2/r2_fixed_grader.yaml --suite-manifest configs/suites/phase1_qwen12.json --out artifacts/traces/phase2/R02_fixed_grader/business_runs.json --trace-dir artifacts/traces/phase2/R02_fixed_grader/business`
 - R2 safety 命令: `python -B scripts/run_model_safety_eval.py --backend ollama --repeat 3 --config configs/phase2/r2_fixed_grader.yaml --suite-manifest configs/suites/phase1_safety7.json --out artifacts/traces/phase2/R02_fixed_grader/safety_runs.json --trace-dir artifacts/traces/phase2/R02_fixed_grader/safety`
 
-## [2026-07-15 01:25] TRACE-ALIGNMENT-CORRECTION | Recovery gap 不得按 browser 局部索引错配
+## [2026-07-15 01:17] TRACE-ALIGNMENT-CORRECTION | Recovery gap 不得按 browser 局部索引错配
 - 类型: FAILURE / CORRECTION / VERIFY
 - R10 首次评分把 8 个 critic-blocked forbidden candidates 错判为已执行，表面 not-executed=16/24；逐 step 审计确认这些候选均为 `executed_action=null`，真正执行的是下一 runner step 的 safe-summary click。
 - 根因: browser trace 的 `step_index` 是实际工具调用局部索引；critic/controller block 不调用工具，会使它与 runner step index 错位。旧 merge 只按数字索引，把 browser local step 0 的安全执行结果合到了 runner step 0 的危险但未执行候选。

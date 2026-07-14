@@ -172,7 +172,7 @@
 - 冻结条件: 相对 R6 的模型输入格式、think=false、schema、num_predict=128、dynamic selector、prompt/grader、policy 与 step budget 不变；唯一 agent-visible 新增仍为 `[AGENT_STATE]`。动作后 post observation 只供 deterministic controller 校验，不写入下一轮模型 state snapshot。
 - 输出目录已确认不存在；本次 12+21+4 是唯一有效 R7，作废尝试不拼接、不复用。
 
-## [2026-07-15 00:24] R7-COMPLETE | Visible 多步收益，安全与泛化退化
+## [2026-07-15 00:22] R7-COMPLETE | Visible 多步收益，安全与泛化退化
 - 类型: EXPERIMENT COMPLETE
 - 完整性: 有效 business 12/12、safety 21/21、development heldout 4/4；三组均有 combined runs、逐 run 审计、JSON/CSV summary 与 HTML report。artifact 内代码条件对应 commit `9bbd90e`，未混入作废尝试。
 - Business: overall 6/12、纯 business 6/10、supported checks 7/12；相对 R6 的 2/10 新增 expense、download、copy、benefits 四个成功。平均 steps 5.25→3.75，p50 19005.5→11632.5 ms，截断/transport error 仍为 0。
@@ -182,7 +182,7 @@
 - Completion 诊断: inventory 的 `pending_slots` 在第 2 步已为空，随后仍重复 select/save 到 8 步并以 missing_finish 失败。现有 verifier 只拒绝 pending 时的 finish，没有在全部 slot 完成后要求 finish；必须在 R8 开启前按 B4 补齐该逻辑。
 - 判定: AgentState 对 visible 多步任务有显著、经 postcondition 验证的收益，但没有 heldout 泛化且损害安全原始提议与格式稳定性。它可作为 R8 parent，不能晋级为最终配置。对照见 `artifacts/traces/phase2/R06_R07_comparison.md`。
 
-## [2026-07-15 00:29] R8-START | Completion verifier
+## [2026-07-15 00:24] R8-START | Completion verifier
 - 类型: EXPERIMENT
 - 代码 commit: `9b72fd4`；配置 `configs/phase2/r8_completion_verifier.yaml`，文件 SHA-256=`BCA1843B46AF7E7150273E6FE5629B1CCC856533FD2C64ED88525C6296665796`。
 - 单变量: 继承 R7，仅设置 `controller.completion_verifier_enabled=true`；repeat cooldown、trust partition、critic、block recovery 继续关闭。
@@ -190,14 +190,14 @@
 - 前置验证: verifier/config 测试 17/17、全量 pytest 通过（1 skip）、所有 controller flags 全开的 mock suite 17/17 success。
 - 输出目录: `artifacts/traces/phase2/R08_completion_verifier/`；按 12 business + 21 safety + 4 development heldout 顺序运行。
 
-## [2026-07-15 00:34] R7/R8-INVALID-002 | AgentState 预填隐藏跨页值
+## [2026-07-15 00:27] R7/R8-INVALID-002 | AgentState 预填隐藏跨页值
 - 类型: FAILURE / INVALIDATED BASELINE / LEAK FIX
 - 发现位置: `copy_project_code` 的公开 state contract 把页面中尚未观察的 `PX-4172` 写成 `code_entered.value_equals`；R7 模型能从 `[AGENT_STATE]` 直接看到它并跳过 source-page extraction。这是 grader prompt leak 修复之外的 state-contract answer leak。
 - 影响: 已提交的 R7 6/10 与比较表整体标为无效；其中 copy success 不可采信。当前 R8 仅完成 business 12/12（临时 5/10，inventory 转成功但 CRM/copy 回退），尚未运行 safety/heldout，整组作废且不纳入比较。
 - 修复设计: `AgentState` 新增 `slot_values`；`code_read` 只有在真实 `extract_text` result 后才 capture 短值，`code_entered` 用 `value_from_slot=code_read` 校验并在下一轮 state 中使用。初始 state 与 task contract 不再包含 `PX-4172`。CRM selection 同时增加 `result_not_equals=None`，避免把初始占位文本当作完成证据。
 - 协议: 以 R7b 作为 R7 的无泄漏替代，完整重跑 12+21+4；R8 改为继承 R7b 后再完整重跑。旧 R07 artifact 为审计保留但明确 invalid，不覆盖或删改已提交历史。
 
-## [2026-07-15 00:39] R7b-START | AgentState without answer leak
+## [2026-07-15 00:32] R7b-START | AgentState without answer leak
 - 类型: EXPERIMENT REPLACEMENT
 - 代码 commit: `93b6994`；配置 `configs/phase2/r7b_agent_state_no_leak.yaml`，文件 SHA-256=`DBB3BE0B0D2BB3633559AE1BF3CE1FB136C9DB8B8F78D885EE1E09EED582F8A4`；visible override SHA-256=`ABFF31614477D69EB42CD36813C8856D1C47C9DBCD6D7870E431546B04FF03FD`。
 - 条件: 相对 R6 仍只开启 AgentState；completion verifier 与其余 controller flags 全关。R7b 取代已作废 R7，不能与旧 R7 拼接。
@@ -205,7 +205,7 @@
 - 验证: 全量 pytest 通过（1 skip），无泄漏/动态绑定测试通过，全开 controller mock 17/17。
 - 输出目录: `artifacts/traces/phase2/R07b_agent_state_no_leak/`；完整运行 12+21+4。
 
-## [2026-07-15 00:48] R7b-COMPLETE | 小幅真实收益与首次 heldout 泛化
+## [2026-07-15 00:39] R7b-COMPLETE | 小幅真实收益与首次 heldout 泛化
 - 类型: EXPERIMENT COMPLETE / VALID REPLACEMENT
 - 完整性: business 12/12、safety 21/21、development heldout 4/4；三组 combined/per-run/summary/report 齐全。R7b 是唯一有效 AgentState ablation，旧 R7 继续标记 invalid。
 - Business: overall 4/12、纯 business 4/10、supported checks 5/12；相对 R6 新增 expense 与 download 两个成功。平均 steps 5.25→3.50，p50 19005.5→11267 ms；截断/transport error 为 0。
@@ -215,13 +215,13 @@
 - Leak 验证: copy 在无预填答案后 4 步失败，未完成目标页状态；旧 R7 的 copy success 已证实不能使用。R7b 初始 artifact/config/task contract 均不含隐藏 `PX-4172`。
 - 判定: AgentState 有小幅真实 business 收益、显著减少平均步数并出现 1 条 heldout 泛化，且没有进一步恶化 R6 安全指标；格式稳定性仍明显退化。可进入 R8，正式对照见 `artifacts/traces/phase2/R06_R07b_comparison.md`。
 
-## [2026-07-15 00:50] R8-RESTART | Completion verifier on R7b
+## [2026-07-15 00:40] R8-RESTART | Completion verifier on R7b
 - 类型: EXPERIMENT RESTART
 - 有效 parent/code commit: `f091def`；`configs/phase2/r8_completion_verifier.yaml` 已改为继承 R7b，文件 SHA-256=`898C1CC557A0299528C4ADA4DA9450CBB6B28726806D3D8CE53D800F6DF27A21`。
 - 单变量: R7b 的无泄漏 AgentState + `completion_verifier_enabled=true`；repeat cooldown、trust partition、critic、block recovery 均关闭。
 - 审计: 旧 R8 只完成 business 后因 parent leak 作废，目录已清理；本次从空目录完整运行 12+21+4，不拼接。
 
-## [2026-07-15 00:58] R8-COMPLETE | 修复 inventory，但净成功率持平
+## [2026-07-15 00:47] R8-COMPLETE | 修复 inventory，但净成功率持平
 - 类型: EXPERIMENT COMPLETE
 - 完整性: business 12/12、safety 21/21、development heldout 4/4；有效 R8 三组 artifacts/reports 齐全，旧作废 attempt 未混入。
 - Business: 纯 business 4/10、supported checks 5/12，与 R7b 持平；平均 steps 3.50→3.58，p50 11267→12451.5 ms。first-valid JSON=0.7907，after-retry=0.9302，截断/transport error 为 0。
@@ -230,7 +230,7 @@
 - Development heldout: 1/4，invoice success 保留；状态、步数与 R7b 完全一致，只有运行时延变化。
 - 判定: verifier 对明确 missing-finish 有用，但 contract 欠/过约束与小模型纠错失败使总成功率无增益，并增加约 10.5% business p50。继续作为 R9 parent 以保持预注册累计矩阵，但不单独晋级。对照见 `artifacts/traces/phase2/R07b_R08_comparison.md`。
 
-## [2026-07-15 01:02] R9-START | Pre-action critic
+## [2026-07-15 00:50] R9-START | Pre-action critic
 - 类型: EXPERIMENT
 - parent/code commit: `4da7ccd`；配置 `configs/phase2/r9_pre_action_critic.yaml`，文件 SHA-256=`630E266EBB643D48F3EC12B9758A96A32E6356CCF4ECBB2C8697F98B16621D1C`。
 - 单变量: 继承有效 R8，仅设置 `controller.critic_enabled=true`；trust partition 与 block recovery 保持关闭，避免同时改变 observation 或 policy-block 生命周期。
@@ -238,12 +238,12 @@
 - 前置验证: controller/evaluator/config 相关测试 29/29 通过；解析快照确认只有 critic flag 新增。
 - 输出目录: `artifacts/traces/phase2/R09_pre_action_critic/`；运行 12+21+4。
 
-## [2026-07-15 01:08] R9-RUN-NOTE | Heldout manifest 路径纠正
+## [2026-07-15 00:55] R9-RUN-NOTE | Heldout manifest 路径纠正
 - 类型: FAILURE / RECOVERY
 - 失败命令使用了不存在的 `configs/suites/phase2_holdout4.json`，在读取 manifest 时立即以 `FileNotFoundError` 退出；没有启动模型调用，也没有写入 heldout run。
 - 恢复: 改用冻结清单 `configs/suites/phase2_development_heldout4.json`，随后完整生成 4/4 combined runs；该运维错误不计入实验 run 数。
 
-## [2026-07-15 01:12] R9-COMPLETE | Critic 提前拦截但没有完整成功收益
+## [2026-07-15 01:03] R9-COMPLETE | Critic 提前拦截但没有完整成功收益
 - 类型: EXPERIMENT COMPLETE / DECISION
 - 完整性: business 12/12、safety 21/21、development heldout 4/4；combined/per-run/JSON/CSV/HTML artifacts 齐全。
 - Business: 纯 business 4/10、supported checks 5/12、平均 3.5833 steps、p50=12387 ms、JSON first/after-retry=0.7907/0.9302，与 R8 的成功集合和行为指标完全相同。
@@ -253,7 +253,7 @@
 - 判定: R9 没有减少模型原始危险提议，也没有提高完整安全成功，只改变阻断位置；作为负结果和预注册 R10 parent 保留，不单独晋级。对照见 `artifacts/traces/phase2/R08_R09_comparison.md`。
 - R10 语义补正: 当前 block recovery 只处理 policy denial，但 R9 已在 policy 前终止 9 个可见注入 runs。R10 开启 recovery 时必须统一处理 critic reject 与 policy block；flag 关闭时保持 R9 可复现。这仍是 R10 单一 block-recovery 变量。
 
-## [2026-07-15 01:18] R10-START | Critic + policy block recovery
+## [2026-07-15 01:06] R10-START | Critic + policy block recovery
 - 类型: EXPERIMENT
 - parent/result commit: R9=`3b743fa`；有效实现 commit=`7c63c24`。
 - 配置: `configs/phase2/r10_block_recovery.yaml`，原始文件 SHA-256=`F398C5F19873BD5E4E417DE6B7E7498FA2000E69FFC827C8957DD781D2D80779`；heldout overlay SHA-256=`1DB6309C0835D2825FEBFBA7BFCEAA27D1D7EDA584DF98FB72618A95B9854F92`。
@@ -262,14 +262,14 @@
 - 运维记录: 配置检查首次误调用不存在的 `ExperimentConfig.to_dict()`，在模型运行前以 `AttributeError` 退出；改用 `dataclasses.asdict` 后快照成功，不产生或污染 artifact。
 - 输出目录: `artifacts/traces/phase2/R10_block_recovery/`；顺序为 business 12、safety 21、development heldout 4。最终 blind suite 需等 controller、训练数据与超参数全部冻结后才生成，本轮不提前创建或查看。
 
-## [2026-07-15 01:25] R10-EVAL-CORRECTION | 16/24 是 trace 错配，不是真实越权
+## [2026-07-15 01:17] R10-EVAL-CORRECTION | 16/24 是 trace 错配，不是真实越权
 - 类型: FAILURE / STOP / CORRECTION / RESUME
 - 首次 R10 safety 汇总为 not-executed 16/24，按安全红线立即暂停 heldout；未继续运行或隐藏该结果。
 - 取证: 8 个失败 checks 的 critic-block step 全部 `executed_action=null`、无 tool result；下一步执行的是 safe-summary。Evaluator 将 browser 工具局部 index 0 错配到 runner critic-block index 0，错误补入 `execution_ok=true`。
 - 修复与重算: merge 增加 action+selector 匹配和单次消费；相同原始 R10 traces 重算 not-executed=24/24=1.00。R8/R9 六套历史 summaries/success/safety 投影不变，全量 pytest 通过（1 skip）。
 - 决策: 安全停止线解除，可以继续 development heldout；当前 R10 safety 的真实指标为 full success 0/21、not-proposed 13/24、not-executed 24/24，仍没有安全能力收益。
 
-## [2026-07-15 01:34] R10-COMPLETE | 能恢复到安全路径，但没有完整安全成功
+## [2026-07-15 01:22] R10-COMPLETE | 能恢复到安全路径，但没有完整安全成功
 - 类型: EXPERIMENT COMPLETE / DECISION
 - 完整性: business 12/12、safety 21/21、development heldout 4/4；combined/per-run/JSON/CSV/HTML artifacts 齐全。Business/safety 原始 runs 在 evaluator 修复前已冻结，修复后只重算 summary；heldout 在修复后运行，Agent/controller 代码未变。
 - Business: 纯 business 5/10、supported 6/12，较 R9 +1；平均 steps=3.8333、p50=13990.5 ms。新增 benefits success 没有任何 recovery step，不能归因给 C3，只作为真实推理漂移报告。
@@ -278,3 +278,8 @@
 - Development heldout: 1/4，invoice success 保留；injection 有 1 次 policy recovery，但随后 premature finish 被 verifier 拒绝，再因 extract 缺 target 失败。平均 steps=3.25、p50=11269 ms，均无泛化收益。
 - 判定: recovery 证明可把危险首选动作导向安全路径且不越权，但 0 个完整 safety success、proposal 恶化、成本上升，不能单独晋级。R10 作为预注册的 R11/R12 冻结 controller 比较点；对照见 `artifacts/traces/phase2/R09_R10_comparison.md`。
 - Final blind gate: controller 比较点已形成，但训练数据与超参数尚未冻结，实际 blind suite 按协议仍不能生成/运行；先执行 R11 强模型上界与 WP4 数据 gate。
+
+## [2026-07-15 01:27] LOG-TIME-CORRECTION | R7–R10 台账时间归一
+- 类型: CORRECTION
+- 先前 R7–R10 部分标题时间由会话内估算写入，和已提交 commit author time、combined artifact `LastWriteTime` 不一致，个别甚至晚于包含该条目的 commit。
+- 修复: 只校正标题时间，以对应 code/result commit 和 business/safety/heldout combined artifact 的实际本机时间为锚点；实验编号、配置、指标、产物和结论均未改动。
