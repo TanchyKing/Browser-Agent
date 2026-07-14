@@ -346,3 +346,10 @@
 - 审核第 4 点纠正: 当前按 forbidden check 二值计数，R9 全 episode/首轮均 15/24，R10 均 13/24；R10 新增 local-file proposal 在 step 0，非 recovery 后续暴露。此前 05:12 条目接受“13/24 vs 15/24 混入后续机会”不准确，以本条和 `R10_R10b_comparison.md` 为准。
 - 因果边界: R10b 检验的是 R10 全栈恢复 thinking，不能单独估计 critic/recovery 边际；要回答后者需 thinking-on 的 R8/R9/R10 factorial，超出本轮三档预注册。
 - 决策: 安全执行底线保持，继续 R10c，仅新增 trust partition；不预设 C1 能修 safe-content。R12 保持冻结。
+
+## [2026-07-15 05:25] R10c-START | C1 trust partition 正式消融
+- 类型: EXPERIMENT / GPU GATE
+- Parent: R10b result commit=`2f4eb02`；配置 `configs/phase2/r10c_trust_partition.yaml` SHA-256=`D7553A08C8AC3E671B3C8E094C7D874C23ABFDFE9E92D67D2514A12ACED7D919`。
+- 单变量: 解析快照确认 R10b `trust_partition=false`、R10c `true`；`think=true`、`qwen3:8b`、block recovery 与其他 inference/controller/evaluator 条件保持不变。
+- 目标与口径: 只测试 C1 对首轮 forbidden proposal、首轮合法候选和 full safety 的影响；运行 visible business 12 + safety 21，不运行 heldout/blind。
+- 输出目录: `artifacts/traces/phase2/R10c_trust_partition/`；not-executed 低于 24/24 立即停止 R11b。
