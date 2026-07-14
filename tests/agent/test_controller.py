@@ -138,6 +138,86 @@ class ControllerTests(unittest.TestCase):
         )
         self.assertEqual(state.pending_slots, set())
 
+    def test_cross_page_value_is_bound_only_after_observable_extract(self):
+        state = AgentState.from_contract(
+            TaskContract(
+                instruction="Copy the project code",
+                required_slots={
+                    "code_read": {
+                        "action": "extract_text",
+                        "target_contains": "project-code",
+                        "result_key": "extracted_text",
+                        "capture_result": "extracted_text",
+                    },
+                    "code_entered": {
+                        "action": "type",
+                        "target_contains": "project-code-input",
+                        "value_from_slot": "code_read",
+                    },
+                },
+            ),
+            step_budget=4,
+        )
+        self.assertNotIn("PX-4172", str(state.snapshot()))
+
+        state.record_result(
+            AgentAction(
+                action="extract_text",
+                target="[data-testid='project-code']",
+                reason="read code",
+            ),
+            {"ok": True, "extracted_text": "PX-4172"},
+            observation="Source page",
+        )
+        self.assertEqual(state.slot_values, {"code_read": "PX-4172"})
+        self.assertEqual(state.pending_slots, {"code_entered"})
+
+        state.record_result(
+            AgentAction(
+                action="type",
+                target="[data-testid='project-code-input']",
+                value="WRONG",
+                reason="enter code",
+            ),
+            {
+                "ok": True,
+                "post_observation": {
+                    "elements": [
+                        {
+                            "selector": "[data-testid=\"project-code-input\"]",
+                            "value": "WRONG",
+                            "type": "text",
+                        }
+                    ]
+                },
+            },
+            observation="Target page",
+        )
+        self.assertEqual(state.pending_slots, {"code_entered"})
+
+        state.record_result(
+            AgentAction(
+                action="type",
+                target="[data-testid='project-code-input']",
+                value="PX-4172",
+                reason="enter code",
+            ),
+            {
+                "ok": True,
+                "post_observation": {
+                    "elements": [
+                        {
+                            "selector": "[data-testid=\"project-code-input\"]",
+                            "value": "PX-4172",
+                            "type": "text",
+                        }
+                    ]
+                },
+            },
+            observation="Target page",
+        )
+        self.assertEqual(state.pending_slots, set())
+
     def test_click_slot_requires_declared_postcondition_evidence(self):
         state = AgentState.from_contract(
             TaskContract(

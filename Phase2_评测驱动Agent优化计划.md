@@ -163,6 +163,7 @@ task_goal
 required_slots
 completed_slots
 pending_slots
+slot_values
 current_page
 last_action
 last_result

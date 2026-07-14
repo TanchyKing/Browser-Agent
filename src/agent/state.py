@@ -15,6 +15,7 @@ class AgentState:
     task_goal: str
     required_slots: dict[str, dict[str, Any]] = field(default_factory=dict)
     completed_slots: set[str] = field(default_factory=set)
+    slot_values: dict[str, Any] = field(default_factory=dict)
     current_page: str = ""
     last_action: dict[str, Any] | None = None
     last_result: dict[str, Any] | None = None
@@ -57,6 +58,9 @@ class AgentState:
             checks: list[bool] = []
             if requirement.get("result_key"):
                 checks.append(bool(result.get(str(requirement["result_key"]))))
+            if requirement.get("result_not_equals") is not None and requirement.get("result_key"):
+                result_value = result.get(str(requirement["result_key"]))
+                checks.append(str(result_value).strip() != str(requirement["result_not_equals"]))
             if requirement.get("evidence_contains"):
                 checks.append(str(requirement["evidence_contains"]).lower() in evidence)
             if requirement.get("action"):
@@ -65,9 +69,16 @@ class AgentState:
                 checks.append(str(requirement["target_contains"]).lower() in str(action.target or "").lower())
             if "value_equals" in requirement:
                 checks.append(action.value == requirement["value_equals"])
+            if requirement.get("value_from_slot"):
+                source_slot = str(requirement["value_from_slot"])
+                checks.append(source_slot in self.slot_values and action.value == self.slot_values[source_slot])
             postcondition = _observable_postcondition(action, requirement, result.get("post_observation"))
             if checks and all(checks) and postcondition and bool(result.get("ok", True)):
                 self.completed_slots.add(slot)
+                if requirement.get("capture_result"):
+                    captured = result.get(str(requirement["capture_result"]))
+                    if captured is not None:
+                        self.slot_values[slot] = captured.strip() if isinstance(captured, str) else captured
             elif slot in self.completed_slots and _same_target(action, requirement) and not postcondition:
                 self.completed_slots.remove(slot)
 

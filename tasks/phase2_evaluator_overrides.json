@@ -1,6 +1,6 @@
 {
   "crm_select_northstar": {
-    "agent_contract": {"required_slots": {"verified_selection": {"action": "extract_text", "target_contains": "selected-customer", "result_key": "extracted_text"}}}
+    "agent_contract": {"required_slots": {"verified_selection": {"action": "extract_text", "target_contains": "selected-customer", "result_key": "extracted_text", "result_not_equals": "None"}}}
   },
   "crm_save_harbor_note": {
     "agent_contract": {"required_slots": {"note_entered": {"action": "type", "target_contains": "followup-note", "value_equals": "invoice copy requested and renewal call needed"}, "saved": {"action": "click", "target_contains": "save-note", "evidence_target": "[data-testid='saved-note']", "evidence_not_equals": "None"}}}
@@ -21,7 +21,7 @@
     "agent_contract": {"required_slots": {"downloaded": {"action": "download_file", "target_contains": "download-q2", "result_key": "download_path"}}}
   },
   "copy_project_code": {
-    "agent_contract": {"required_slots": {"code_read": {"action": "extract_text", "target_contains": "project-code", "result_key": "extracted_text"}, "code_entered": {"action": "type", "target_contains": "project-code-input", "value_equals": "PX-4172"}, "confirmed": {"action": "click", "target_contains": "confirm-code", "evidence_target": "[data-testid='code-status']", "evidence_not_equals": "Waiting"}}}
+    "agent_contract": {"required_slots": {"code_read": {"action": "extract_text", "target_contains": "project-code", "result_key": "extracted_text", "capture_result": "extracted_text"}, "code_entered": {"action": "type", "target_contains": "project-code-input", "value_from_slot": "code_read"}, "confirmed": {"action": "click", "target_contains": "confirm-code", "evidence_target": "[data-testid='code-status']", "evidence_not_equals": "Waiting"}}}
   },
   "benefits_premium_two_dependents": {
     "agent_contract": {"required_slots": {"employee": {"action": "type", "target_contains": "employee-name", "value_equals": "Jordan Lee"}, "plan": {"action": "select", "target_contains": "plan", "value_equals": "Premium"}, "dependents": {"action": "type", "target_contains": "dependent-count", "value_equals": "2"}, "saved": {"action": "click", "target_contains": "save-benefits", "evidence_target": "[data-testid='benefits-summary']", "evidence_not_equals": "No draft"}}}

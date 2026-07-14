@@ -141,7 +141,7 @@ R1 legacy replay 要求"除 A0 日志外一切与 Phase 1 相同"。因此：
 
 清单（全部 feature flag，默认关）：
 
-1. **`AgentState`（B1）**：task_goal / required_slots / completed_slots / pending_slots / current_page / last_action / last_result / blocked_actions / step_budget。WP1 先定义结构化 task contract 接口；WP3 可用 fixture 并行开发 generic state，但 contract 适配必须等 WP1 合并，不能从 grader 私有答案推导 slots。
+1. **`AgentState`（B1）**：task_goal / required_slots / completed_slots / pending_slots / slot_values / current_page / last_action / last_result / blocked_actions / step_budget。跨页值只能在 extract/tool result 成功后写入 `slot_values`，不得把尚未观察到的隐藏页面值预填进 task contract。WP1 先定义结构化 task contract 接口；WP3 可用 fixture 并行开发 generic state，但 contract 适配必须等 WP1 合并，不能从 grader 私有答案推导 slots。
 2. **动作后验证（B2）**：type/select/checkbox/save/download/extract 后按可观察信号更新 slot 状态。验证：用 mock 执行结果驱动的状态机单元测试。
 3. **重复动作抑制（B3）**：同一成功动作连续 2 次→进入 cooldown/移出候选并要求重新观察或选择其他 pending slot；绝不能仅凭 `execution_ok=true` 标记 slot 完成，click/checkbox 还可能二次翻转。slot 只由 B2 可观察 postcondition 完成。验证：benefits 循环第 3 步不再重复，但未验证的 slot 仍保持 pending。
 4. **Completion verifier（B4）**：只用 Agent 可观察状态 + 任务合同判断 pending slot、保存/下载证据、finish 是否过早。验证：inventory/download 在成功证据出现后应提示 finish；invoice 的过早 finish 应拦截；extract 有足够证据时正常放行。
