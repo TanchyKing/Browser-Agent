@@ -83,6 +83,21 @@ class LLMObservabilityTests(unittest.TestCase):
         self.assertNotIn("DO NOT COPY THIS PROSE", adapter.requests[1].observation)
         self.assertLessEqual(len(adapter.requests[1].task), 500)
 
+    def test_transport_timeout_is_recorded_as_failed_step_instead_of_crashing_suite(self):
+        class TimeoutAdapter:
+            model_name = "timeout-model"
+
+            def complete(self, request):
+                raise TimeoutError("timed out")
+
+        result = BrowserAgentRunner(TimeoutAdapter(), _StaticTools()).run("safe task")
+
+        self.assertFalse(result.completed)
+        self.assertEqual(result.steps[0].result["error_type"], "llm_transport_error")
+        self.assertIn("TimeoutError", result.steps[0].result["llm_transport_error"])
+        audit = result.steps[0].result["llm_attempts"][0]
+        self.assertEqual(audit["response"]["done_reason"], "transport_error")
+
 
 if __name__ == "__main__":
     unittest.main()

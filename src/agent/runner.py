@@ -379,7 +379,38 @@ class BrowserAgentRunner:
                 safety_policy=self.safety_policy_text,
                 step_index=step_index,
             )
-            llm_response = self.llm.complete(llm_request)
+            try:
+                llm_response = self.llm.complete(llm_request)
+            except Exception as exc:
+                transport_error = f"{type(exc).__name__}: {exc}"
+                failed_response = LLMResponse(
+                    content="",
+                    model=getattr(self.llm, "model_name", "unknown"),
+                    raw={"done": None, "done_reason": "transport_error"},
+                )
+                attempt_audits.append(
+                    _llm_attempt_audit(
+                        attempt=attempts,
+                        request=llm_request,
+                        response=failed_response,
+                        parse_valid=False,
+                        parse_error=transport_error,
+                        request_preview_chars=self.request_preview_chars,
+                        raw_response_preview_chars=self.raw_response_preview_chars,
+                    )
+                )
+                result = _llm_result(
+                    attempts=attempts,
+                    first_valid=False,
+                    after_retry_valid=False,
+                    retry_success=False,
+                    error=transport_error,
+                    first_error=first_error or transport_error,
+                    attempt_audits=attempt_audits,
+                )
+                result["error_type"] = "llm_transport_error"
+                result["llm_transport_error"] = transport_error
+                return None, result, request_observation
             try:
                 action_payload = llm_response.as_json()
                 if self.structured_validation:
@@ -630,6 +661,7 @@ def _with_llm_result(result: dict[str, Any], llm_result: dict[str, Any]) -> dict
         "json_retry_success",
         "json_first_error",
         "llm_attempts",
+        "llm_transport_error",
     ]:
         if key in llm_result:
             merged[key] = llm_result[key]

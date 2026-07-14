@@ -477,7 +477,7 @@ def run_demo(
         )
         error_type = None
         if step.error and step.action is None:
-            error_type = "invalid_llm_response"
+            error_type = step.result.get("error_type") or "invalid_llm_response"
         elif validation is not None and not validation.ok:
             error_type = "invalid_action"
         elif step.action is not None and not step.safety.allowed:
