@@ -196,3 +196,21 @@
 - 影响: 已提交的 R7 6/10 与比较表整体标为无效；其中 copy success 不可采信。当前 R8 仅完成 business 12/12（临时 5/10，inventory 转成功但 CRM/copy 回退），尚未运行 safety/heldout，整组作废且不纳入比较。
 - 修复设计: `AgentState` 新增 `slot_values`；`code_read` 只有在真实 `extract_text` result 后才 capture 短值，`code_entered` 用 `value_from_slot=code_read` 校验并在下一轮 state 中使用。初始 state 与 task contract 不再包含 `PX-4172`。CRM selection 同时增加 `result_not_equals=None`，避免把初始占位文本当作完成证据。
 - 协议: 以 R7b 作为 R7 的无泄漏替代，完整重跑 12+21+4；R8 改为继承 R7b 后再完整重跑。旧 R07 artifact 为审计保留但明确 invalid，不覆盖或删改已提交历史。
+
+## [2026-07-15 00:39] R7b-START | AgentState without answer leak
+- 类型: EXPERIMENT REPLACEMENT
+- 代码 commit: `93b6994`；配置 `configs/phase2/r7b_agent_state_no_leak.yaml`，文件 SHA-256=`DBB3BE0B0D2BB3633559AE1BF3CE1FB136C9DB8B8F78D885EE1E09EED582F8A4`；visible override SHA-256=`ABFF31614477D69EB42CD36813C8856D1C47C9DBCD6D7870E431546B04FF03FD`。
+- 条件: 相对 R6 仍只开启 AgentState；completion verifier 与其余 controller flags 全关。R7b 取代已作废 R7，不能与旧 R7 拼接。
+- 无泄漏断言: `copy_project_code` 的初始 `TaskContract.required_slots` 不含 `PX-4172`；只有 source 页真实 `extract_text` 成功后，值才进入 `slot_values.code_read`。错误输入值不会完成 `code_entered`。
+- 验证: 全量 pytest 通过（1 skip），无泄漏/动态绑定测试通过，全开 controller mock 17/17。
+- 输出目录: `artifacts/traces/phase2/R07b_agent_state_no_leak/`；完整运行 12+21+4。
+
+## [2026-07-15 00:48] R7b-COMPLETE | 小幅真实收益与首次 heldout 泛化
+- 类型: EXPERIMENT COMPLETE / VALID REPLACEMENT
+- 完整性: business 12/12、safety 21/21、development heldout 4/4；三组 combined/per-run/summary/report 齐全。R7b 是唯一有效 AgentState ablation，旧 R7 继续标记 invalid。
+- Business: overall 4/12、纯 business 4/10、supported checks 5/12；相对 R6 新增 expense 与 download 两个成功。平均 steps 5.25→3.50，p50 19005.5→11267 ms；截断/transport error 为 0。
+- 格式代价: first-valid JSON 1.00→0.7381、after-retry 1.00→0.9524、retry rate=0.2619；invoice 与 benefits 各有 1 个最终 invalid response，主要是复制 state rule 后遗漏 target。
+- Safety: 完整成功 0/21；forbidden 未提出 15/24=0.625、未执行 24/24=1.00，均与 R6 持平。p50=4129 ms、JSON first-valid=1.00、截断为 0。
+- Development heldout: overall 1/4、业务 1/3；`heldout_invoice_platform_ops` 6 步成功，是 Phase 2 controller 的首条开发变体成功。jobs/benefits 仍因缺 target 结构错误失败，injection 仍被 policy block。
+- Leak 验证: copy 在无预填答案后 4 步失败，未完成目标页状态；旧 R7 的 copy success 已证实不能使用。R7b 初始 artifact/config/task contract 均不含隐藏 `PX-4172`。
+- 判定: AgentState 有小幅真实 business 收益、显著减少平均步数并出现 1 条 heldout 泛化，且没有进一步恶化 R6 安全指标；格式稳定性仍明显退化。可进入 R8，正式对照见 `artifacts/traces/phase2/R06_R07b_comparison.md`。
