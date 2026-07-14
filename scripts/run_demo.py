@@ -71,26 +71,7 @@ class BrowserToolsAdapter:
 
     def observe_page(self) -> str:
         observation = self.executor.observe_page()
-        element_lines = []
-        for element in observation.elements:
-            selector = _selector_for_element(element)
-            label = element.get("text") or element.get("name") or element.get("tag")
-            details = [f"selector: {selector}", f"tag: {element.get('tag')}", f"text: {label}"]
-            if element.get("type"):
-                details.append(f"type: {element.get('type')}")
-            if element.get("checked") is not None:
-                details.append(f"checked: {element.get('checked')}")
-            if element.get("options"):
-                details.append(f"options: {element.get('options')}")
-            if element.get("download"):
-                details.append(f"download: {element.get('download')}")
-            element_lines.append("- " + "; ".join(details))
-        return (
-            f"Title: {observation.title}\n"
-            f"URL: {observation.url}\n"
-            f"Elements:\n" + "\n".join(element_lines) + "\n\n"
-            f"Visible text:\n{observation.text}"
-        )
+        return _format_browser_observation(observation)
 
     def execute(self, action: AgentAction) -> dict[str, Any]:
         browser_action = BrowserAction(
@@ -108,6 +89,29 @@ class BrowserToolsAdapter:
         return _browser_result_to_dict(result)
 
 
+def _format_browser_observation(observation: Any) -> str:
+    element_lines = []
+    for element in observation.elements:
+        selector = _selector_for_element(element)
+        label = element.get("text") or element.get("name") or element.get("tag")
+        details = [f"selector: {selector}", f"tag: {element.get('tag')}", f"text: {label}"]
+        if element.get("type"):
+            details.append(f"type: {element.get('type')}")
+        if element.get("checked") is not None:
+            details.append(f"checked: {element.get('checked')}")
+        if element.get("options"):
+            details.append(f"options: {element.get('options')}")
+        if element.get("download"):
+            details.append(f"download: {element.get('download')}")
+        element_lines.append("- " + "; ".join(details))
+    return (
+        f"Title: {observation.title}\n"
+        f"URL: {observation.url}\n"
+        f"Elements:\n" + "\n".join(element_lines) + "\n\n"
+        f"Visible text:\n{observation.text}"
+    )
+
+
 def _browser_result_to_dict(result: BrowserActionResult) -> dict[str, Any]:
     return {
         "ok": result.ok,
@@ -117,6 +121,35 @@ def _browser_result_to_dict(result: BrowserActionResult) -> dict[str, Any]:
         "extracted_text": result.extracted_text,
         "download_path": result.download_path,
         "metadata": result.metadata,
+        "post_observation": _browser_observation_to_state(result.observation),
+    }
+
+
+def _browser_observation_to_state(observation: Any | None) -> dict[str, Any] | None:
+    if observation is None:
+        return None
+    return {
+        "url": observation.url,
+        "title": observation.title,
+        "text": observation.text,
+        "elements": [
+            {
+                key: element.get(key)
+                for key in (
+                    "selector",
+                    "tag",
+                    "text",
+                    "value",
+                    "type",
+                    "checked",
+                    "id",
+                    "name",
+                    "testid",
+                )
+                if element.get(key) is not None
+            }
+            for element in observation.elements
+        ],
     }
 
 

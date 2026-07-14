@@ -139,3 +139,28 @@
 - Development heldout: 0/4，三个业务变体仍跑满 8 steps；p50=23166.5 ms，JSON first-valid=1.00、截断为 0。
 - 行为差异: selector enum 改变了少量失败轨迹（expense 少一次重复 click、copy 改为输入页面可见字面值、heldout jobs 少一次重复 apply），但没有转化成任何 visible 或 heldout 成功。
 - 判定: 动态 selector 枚举在当前套件上没有可测成功率收益，selector grounding 不是 R5 之后的主瓶颈；主要问题仍是状态推进、完成判断和安全语义。按预注册矩阵进入 R7，只开启 `AgentState`。
+
+## [2026-07-14 23:51] R7-START | AgentState
+- 类型: EXPERIMENT
+- 代码 commit: `e64188b`；配置 `configs/phase2/r7_agent_state.yaml`，文件 SHA-256=`CF3102C9D78BBB4038142AD351AF593070CF7FEC28DC3AE89764BC0C2CF51E23`，解析后配置 digest 写入 artifact。
+- 单变量: 继承 R6，只设置 `controller.enabled=true` 与 `controller.state_enabled=true`；completion verifier、repeat cooldown、trust partition、critic、block recovery 均保持关闭。
+- 前置验证: experiment config、controller 与 run-demo helper 测试 17/17 通过；解析快照确认 think=false、schema、num_predict=128、dynamic selector 与 v2 grader 未变。
+- 解释边界: visible 业务任务通过冻结 override 提供公开 required slots；development heldout 未提供 required slots，因此 R7 heldout 只检验通用 state 字段（当前页、上一步动作/结果等），不把它解释为 slot verifier 泛化结果。
+- 输出目录: `artifacts/traces/phase2/R07_agent_state/`；顺序仍为 visible 12+21，再运行 4-task development heldout。
+
+## [2026-07-15 00:00] R7-INVALID-001 | State 未使用动作后 DOM 证据
+- 类型: FAILURE / INVALIDATED RUN / IMPLEMENTATION CORRECTION
+- 作废尝试完整性: business 12/12、safety 21/21、development heldout 4/4；临时结果为纯 business 6/10、safety 完整成功 0/21、forbidden 未提出 12/24、heldout 0/4。上述结果只用于发现实现问题，不纳入 R7 对照表。
+- 根因: Playwright executor 已返回动作后的 `BrowserObservation`，但 `BrowserToolsAdapter` 在转成 agent result 时丢弃了它；`AgentState.record_result` 因而对 type/select/click slot 只检查候选 action、value 与 `ok=true`。这违反落地计划 B2“slot 只能由可观察 postcondition 更新”，也会使后续 completion verifier 建立在过度乐观状态上。
+- 处置: 整次 R7 尝试作废并清理未提交 artifact，不能把 6/10 当成有效改进。R8 暂停，先把 post-action element value/checked/status 证据传入 state；checkbox 被再次取消时必须回到 pending。
+- Contract 补正: visible 与 development heldout 的公开 `agent_contract` 增加 action target 和 postcondition target，只使用用户指令中的值、页面公开 selector 与初始占位状态，不读取或复制 evaluator 私有 success-check 答案。R2–R6 controller 关闭，因此这些 state-only 字段不改变旧运行语义。
+- Claude 协作状态: 本机未安装可调用的 Claude CLI，无法进行直接往返复核；不伪造外部审核结论。该修复由代码路径、现有计划约束和新增回归测试共同验证。
+
+## [2026-07-15 00:11] R7-CORRECTION-COMPLETE | Observable postcondition 链路修复
+- 类型: IMPLEMENTATION CORRECTION / VERIFY
+- 修复: browser observation 增加 form `value`；adapter 只向 controller result 传递动作后 URL/title/body/elements，且不把完整 post observation 回灌到模型 state snapshot；state 用真实 value、checked、下载/提取结果或保存后初始状态行消失来更新 slot。
+- Selector 等价: postcondition 匹配同时识别 executor selector、`#id`、`data-testid` 与 `name`，避免同一元素因 selector 表达不同而被判为未完成。
+- 可逆状态: checkbox 被再次点击为 unchecked 时，对应 slot 从 completed 回到 pending；非 checkbox click 没有公开 postcondition 时不得完成 slot。
+- Contract: visible/development heldout 均补齐公开 state contract；新增字段不进入 contract prompt，也不复制 grader 的期望输出，保存类证据只声明状态 selector 与页面初始占位文本。
+- 验证: 全量 pytest 通过（1 项按环境 skip）；controller/browser/helper 子集 16/16；所有 controller flags 全开的 mock suite 17/17 success。临时 smoke artifact 在提交前清理，不混入正式 R-run。
+- 下一步: 提交实现修复后，以新 commit 从空的 `R07_agent_state/` 目录重跑 12+21+4。

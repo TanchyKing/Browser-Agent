@@ -161,6 +161,7 @@ class PlaywrightBrowserExecutor:
                     index,
                     tag: el.tagName.toLowerCase(),
                     text: (el.innerText || el.value || el.getAttribute('aria-label') || '').trim(),
+                    value: 'value' in el ? el.value : undefined,
                     options: el.tagName.toLowerCase() === 'select'
                         ? Array.from(el.options).map(option => option.value || option.textContent.trim())
                         : undefined,

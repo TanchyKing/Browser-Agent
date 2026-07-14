@@ -49,6 +49,7 @@ class PlaywrightObservationTest(unittest.TestCase):
                 self.assertEqual(approval["type"], "checkbox")
                 self.assertTrue(approval["checked"])
                 self.assertEqual(plan["selector"], 'select[name="plan"]')
+                self.assertEqual(plan["value"], "basic")
                 select_buttons = [element for element in observation.elements if element.get("text") == "Select"]
                 self.assertEqual([element["selector"] for element in select_buttons], ["button >> nth=1", "button >> nth=2"])
 

@@ -50,11 +50,10 @@ class AgentState:
                 str(result.get("extracted_text") or ""),
                 str(result.get("download_path") or ""),
                 json.dumps(result.get("metadata") or {}, ensure_ascii=False, sort_keys=True),
+                json.dumps(result.get("post_observation") or {}, ensure_ascii=False, sort_keys=True),
             ]
         ).lower()
         for slot, requirement in self.required_slots.items():
-            if slot in self.completed_slots:
-                continue
             checks: list[bool] = []
             if requirement.get("result_key"):
                 checks.append(bool(result.get(str(requirement["result_key"]))))
@@ -66,8 +65,11 @@ class AgentState:
                 checks.append(str(requirement["target_contains"]).lower() in str(action.target or "").lower())
             if "value_equals" in requirement:
                 checks.append(action.value == requirement["value_equals"])
-            if checks and all(checks) and bool(result.get("ok", True)):
+            postcondition = _observable_postcondition(action, requirement, result.get("post_observation"))
+            if checks and all(checks) and postcondition and bool(result.get("ok", True)):
                 self.completed_slots.add(slot)
+            elif slot in self.completed_slots and _same_target(action, requirement) and not postcondition:
+                self.completed_slots.remove(slot)
 
     def observe(self, observation: str) -> None:
         self.current_page = observation.splitlines()[0] if observation else ""
@@ -111,5 +113,81 @@ def _public_result(result: dict[str, Any]) -> dict[str, Any]:
         not in {
             "llm_attempts",
             "json_first_error",
+            "post_observation",
         }
     }
+
+
+def _observable_postcondition(
+    action: AgentAction,
+    requirement: dict[str, Any],
+    post_observation: Any,
+) -> bool:
+    if action.action not in {"type", "select", "click"}:
+        return True
+    if not isinstance(post_observation, dict):
+        return False
+
+    target_element = _find_element(post_observation, action.target)
+    if action.action in {"type", "select"}:
+        if target_element is None:
+            return False
+        observed_value = target_element.get("value")
+        return str(observed_value) == str(action.value)
+
+    if target_element and str(target_element.get("type") or "").lower() in {"checkbox", "radio"}:
+        return bool(target_element.get("checked")) == bool(requirement.get("checked_equals", True))
+
+    evidence_target = requirement.get("evidence_target")
+    if not evidence_target:
+        return False
+    evidence_element = _find_element(post_observation, str(evidence_target))
+    observed = (
+        str(evidence_element.get("value") or evidence_element.get("text") or "").strip()
+        if evidence_element is not None
+        else ""
+    )
+    body_text = str(post_observation.get("text") or "")
+    body_lines = {line.strip() for line in body_text.splitlines() if line.strip()}
+    if "evidence_equals" in requirement:
+        expected = str(requirement["evidence_equals"])
+        return observed == expected if evidence_element is not None else expected in body_lines
+    if "evidence_not_equals" in requirement:
+        initial = str(requirement["evidence_not_equals"])
+        return observed != initial if evidence_element is not None else initial not in body_lines
+    if requirement.get("evidence_contains"):
+        needle = str(requirement["evidence_contains"]).lower()
+        return needle in (observed if evidence_element is not None else body_text).lower()
+    return bool(observed)
+
+
+def _same_target(action: AgentAction, requirement: dict[str, Any]) -> bool:
+    contains = requirement.get("target_contains")
+    return bool(contains and str(contains).lower() in str(action.target or "").lower())
+
+
+def _find_element(observation: dict[str, Any], selector: str | None) -> dict[str, Any] | None:
+    wanted = _selector_key(selector)
+    if not wanted:
+        return None
+    for element in observation.get("elements") or []:
+        if isinstance(element, dict) and wanted in _element_selector_keys(element):
+            return element
+    return None
+
+
+def _element_selector_keys(element: dict[str, Any]) -> set[str]:
+    keys = {_selector_key(element.get("selector"))}
+    if element.get("id"):
+        keys.add(_selector_key(f"#{element['id']}"))
+    if element.get("testid"):
+        keys.add(_selector_key(f"[data-testid='{element['testid']}']"))
+    if element.get("name"):
+        tag = str(element.get("tag") or "*")
+        keys.add(_selector_key(f"{tag}[name='{element['name']}']"))
+    return {key for key in keys if key}
+
+
+def _selector_key(selector: Any) -> str:
+    text = str(selector or "").strip().lower().replace('"', "'")
+    return "".join(text.split())

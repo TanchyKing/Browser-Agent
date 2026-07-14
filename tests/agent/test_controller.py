@@ -56,6 +56,132 @@ class ControllerTests(unittest.TestCase):
         self.assertFalse(decision.allowed)
         self.assertIn("pending", decision.reason)
 
+    def test_type_slot_requires_post_action_element_value(self):
+        state = AgentState.from_contract(
+            TaskContract(
+                instruction="Enter a code",
+                required_slots={
+                    "code": {
+                        "action": "type",
+                        "target_contains": "code",
+                        "value_equals": "PX-4172",
+                    }
+                },
+            ),
+            step_budget=3,
+        )
+        action = AgentAction(action="type", target="#code", value="PX-4172", reason="enter")
+
+        state.record_result(action, {"ok": True}, observation="Code page")
+        self.assertEqual(state.pending_slots, {"code"})
+
+        state.record_result(
+            action,
+            {
+                "ok": True,
+                "post_observation": {
+                    "elements": [
+                        {
+                            "selector": "[data-testid=\"code\"]",
+                            "id": "code",
+                            "testid": "code",
+                            "value": "PX-4172",
+                            "type": "text",
+                        }
+                    ]
+                },
+            },
+            observation="Code page",
+        )
+        self.assertEqual(state.pending_slots, set())
+
+    def test_click_slot_requires_declared_postcondition_evidence(self):
+        state = AgentState.from_contract(
+            TaskContract(
+                instruction="Save draft",
+                required_slots={
+                    "saved": {
+                        "action": "click",
+                        "target_contains": "save",
+                        "evidence_target": "[data-testid='status']",
+                        "evidence_not_equals": "No draft",
+                    }
+                },
+            ),
+            step_budget=3,
+        )
+        action = AgentAction(action="click", target="[data-testid='save']", reason="save")
+
+        state.record_result(action, {"ok": True}, observation="Draft page")
+        self.assertEqual(state.pending_slots, {"saved"})
+
+        state.record_result(
+            action,
+            {
+                "ok": True,
+                "post_observation": {
+                    "text": "Save draft\nDraft saved",
+                    "elements": [
+                        {"selector": "[data-testid=\"save\"]", "tag": "button"},
+                    ]
+                },
+            },
+            observation="Draft page",
+        )
+        self.assertEqual(state.pending_slots, set())
+
+    def test_checkbox_slot_returns_to_pending_when_toggled_off(self):
+        state = AgentState.from_contract(
+            TaskContract(
+                instruction="Approve Ava",
+                required_slots={
+                    "ava_approved": {
+                        "action": "click",
+                        "target_contains": "approve-ava",
+                        "checked_equals": True,
+                    }
+                },
+            ),
+            step_budget=3,
+        )
+        action = AgentAction(action="click", target="[data-testid='approve-ava']", reason="toggle")
+
+        state.record_result(
+            action,
+            {
+                "ok": True,
+                "post_observation": {
+                    "elements": [
+                        {
+                            "selector": "[data-testid=\"approve-ava\"]",
+                            "type": "checkbox",
+                            "checked": True,
+                        }
+                    ]
+                },
+            },
+            observation="Expense page",
+        )
+        self.assertEqual(state.pending_slots, set())
+
+        state.record_result(
+            action,
+            {
+                "ok": True,
+                "post_observation": {
+                    "elements": [
+                        {
+                            "selector": "[data-testid=\"approve-ava\"]",
+                            "type": "checkbox",
+                            "checked": False,
+                        }
+                    ]
+                },
+            },
+            observation="Expense page",
+        )
+        self.assertEqual(state.pending_slots, {"ava_approved"})
+
     def test_repeat_cooldown_prevents_third_execution(self):
         tools = Tools()
         repeated = {"action": "click", "target": "#same", "reason": "click", "risk_level": "low"}

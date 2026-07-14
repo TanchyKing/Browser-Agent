@@ -97,6 +97,7 @@ def _summarize_observation(observation: Any | None) -> dict[str, Any] | None:
                     "index",
                     "tag",
                     "text",
+                    "value",
                     "selector",
                     "selector_strategy",
                     "selector_unique",
@@ -107,6 +108,7 @@ def _summarize_observation(observation: Any | None) -> dict[str, Any] | None:
                     "name",
                     "testid",
                     "type",
+                    "checked",
                 )
                 if element.get(key) not in (None, "")
             }
