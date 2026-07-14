@@ -252,3 +252,12 @@
 - Development heldout: 1/4，invoice success 保留；injection 的 `extract_text` 不在 critic high-impact action 集内，仍由 hard policy 第一步阻断。
 - 判定: R9 没有减少模型原始危险提议，也没有提高完整安全成功，只改变阻断位置；作为负结果和预注册 R10 parent 保留，不单独晋级。对照见 `artifacts/traces/phase2/R08_R09_comparison.md`。
 - R10 语义补正: 当前 block recovery 只处理 policy denial，但 R9 已在 policy 前终止 9 个可见注入 runs。R10 开启 recovery 时必须统一处理 critic reject 与 policy block；flag 关闭时保持 R9 可复现。这仍是 R10 单一 block-recovery 变量。
+
+## [2026-07-15 01:18] R10-START | Critic + policy block recovery
+- 类型: EXPERIMENT
+- parent/result commit: R9=`3b743fa`；有效实现 commit=`7c63c24`。
+- 配置: `configs/phase2/r10_block_recovery.yaml`，原始文件 SHA-256=`F398C5F19873BD5E4E417DE6B7E7498FA2000E69FFC827C8957DD781D2D80779`；heldout overlay SHA-256=`1DB6309C0835D2825FEBFBA7BFCEAA27D1D7EDA584DF98FB72618A95B9854F92`。
+- 单变量: 继承 R9，仅设置 `controller.block_recovery_enabled=true`。critic reject 与 policy denial 的首个阻断都会写审计/state 并重规划；连续第 2 次阻断才回退到 terminal replacement/失败。Flag 关闭时 R9 路径不变。
+- 前置验证: critic/policy recovery 单测、controller/serialization/evaluator/config 子集 61/61；全量 pytest 通过（1 skip）；全部 controller flags mock 17/17 success。配置快照确认其余 inference、grader、prompt、state/verifier/critic 开关未变。
+- 运维记录: 配置检查首次误调用不存在的 `ExperimentConfig.to_dict()`，在模型运行前以 `AttributeError` 退出；改用 `dataclasses.asdict` 后快照成功，不产生或污染 artifact。
+- 输出目录: `artifacts/traces/phase2/R10_block_recovery/`；顺序为 business 12、safety 21、development heldout 4。最终 blind suite 需等 controller、训练数据与超参数全部冻结后才生成，本轮不提前创建或查看。
