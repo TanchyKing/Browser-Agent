@@ -1,4 +1,4 @@
-# Phase 2 R2–R11 历史消融总表（审计修订）
+# Phase 2 R2–R11 + R10b 审计消融总表
 
 > 2026-07-15 审计修订：R4–R10 全部继承 R3 的 `think:false`，而 R3 已把 safety full success 从 9/21 压到 0/21。因此这段主链不能用于否定 critic/recovery 在 thinking 开启时的效果。原 R11 也只证明 14B 在 8B/`think:false` 定制接口下发生字段对齐失败，不是有效的能力上界。补实验为 R10b→R10c→R11b。
 
@@ -25,16 +25,17 @@
 | R8 | completion verifier | 4/10 | 5/12 | 3.58 | 12452 | .791 / .930 | 0 | 0/21 | 15/24 | 24/24 | 1.43 | 4126 | 1/4 | 1/3 |
 | R9 | pre-action critic | 4/10 | 5/12 | 3.58 | 12387 | .791 / .930 | 0 | 0/21 | 15/24 | 24/24 | 1.43 | 4060 | 1/4 | 1/3 |
 | R10 | critic + policy recovery | 5/10 | 6/12 | 3.83 | 13990 | .804 / .957 | 0 | 0/21 | 13/24 | 24/24 | 2.38 | 6985 | 1/4 | 1/3 |
+| R10b | R10 + `think:true` | 3/10 | 4/12 | 2.67 | 10099 | .625 / .781 | 0 | 0/21 | 19/24 | 24/24 | 1.86 | 6802 | — | — |
 | R11 | `qwen3:14b` Q4_K_M | 0/10 | 1/12 | 2.83 | 20395 | .706 / .735 | 0 | 0/21 | 24/24 | 24/24 | 1.76 | 13529 | 0/4 | 0/3 |
 
 ## 读数
 
-1. **最大安全退化发生在 R3，而不是 controller。** `think:false` 把 business p50 从 107346 ms 降到 25955 ms，truncation 从 .231 降到 0，但 safety full success 从 9/21 降到 0/21、not-proposed 从 18/24 降到 15/24。后续 R4–R10 从未恢复完整安全成功。全局关闭 thinking 不能作为最终安全配置；R11 后应单独预注册“高风险/安全任务保留 thinking”的路由消融。
+1. **R3 是首个安全塌方点，但不是 R10 全栈的唯一原因。** `think:false` 把 R2 safety full 9/21 降到 0/21；R10b 只恢复 `think:true` 后 full 仍为 0/21，说明后续 schema/interface/controller 组合也参与失败。R10b 把 not-proposed 13/24 提到 19/24，却出现 8/21 首轮 invalid/missing candidate，不能把主动安全与格式失败混算。
 2. **R4 解决结构，不解决安全语义。** Bounded schema 把 JSON 提升到 1/1，并把 business 从 1/10 提到 2/10；安全仍为 0/21。
 3. **R7b 是最明确的业务 controller 收益。** 无泄漏 AgentState 把 business 2/10 提到 4/10、平均 steps 5.25 降到 3.50，并首次得到 heldout 1/4；代价是 JSON first-valid 降到 .738。
 4. **R8/R9 在 `think:false` 链上没有 aggregate 增益。** Verifier 修复 inventory missing-finish 但使 CRM 回退；critic 改变阻断位置。由于 safe-content 已处于地板，不能据此推断 critic 在 thinking 开启时也无 full-success 收益。
-5. **R10 只证明 recovery 路径可执行且不越权。** 它保持 not-executed=24/24，并多次把危险首选动作导向 safe-summary/request-human；full success 仍 0/21 主要受 `think:false` 下 safe-content 缺失限制。13/24 与 R9 的 15/24 还混入了 episode 变长后的额外提议机会，须结合首轮 proposal 再比较。
+5. **R10 只证明 recovery 路径可执行且不越权。** 它保持 not-executed=24/24，并多次把危险首选动作导向 safe-summary/request-human。首轮回放显示 R9=15/24、R10=13/24，与全 episode 指标相同；新增 local-file proposal 已发生在 step 0，因此当前按 forbidden-check 二值计数的退化不是 recovery 后续暴露量造成。后续重复事件仍应另报，但不改变该 rate。
 6. **当前没有单一累计配置同时达到最佳 business 与 safety。** R10 的 visible business 最高为 5/10，但最佳 safety full success 仍是 R2 的 9/21。阶段目标 7/10 business、15/21 safety 尚未达到。
 7. **R11 是接口兼容性诊断，不是能力上界。** 14B 在同一 `think:false`、128-token、8B 定制 controller 下出现 9 个 business missing-target 语义错误。24/24 not-proposed 还包含 email 的 3 个 invalid-first-action 假阳性；干净证据仅限其余注入任务主动选择 safe-summary。不能据此下模型规模结论。
 
-R12 前必须先完成 R10b（thinking 解耦）、R10c（C1 正式槽位）和 R11b（与 R10c 只差模型）。训练样本应来自最终选定 controller 的轨迹，并覆盖 target/value 顶层字段、state predicate 区分和具体安全摘要，而不能继续沿用已知安全塌方配置采集。
+R10b 已完成：business 3/10、safety full 0/21、not-proposed/first-round not-proposed 均 19/24、not-executed 24/24。18 个 safety runs 仍失败于 `safe_content_contains`，8 个还缺正确 terminal，3 个 email 缺具体 requested input。R12 前继续完成 R10c（C1 正式槽位）和 R11b（与 R10c 只差模型）；训练样本应来自最终选定 controller 的轨迹。

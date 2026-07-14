@@ -328,3 +328,21 @@
 - 暴露量混淆: R9→R10 平均 steps 1.43→2.38，13/24 vs 15/24 混入 recovery 后续提议机会；补报首轮 proposal 后再判断行为变化。
 - R11 降级: 原 R11 的 14B 在 8B 定制、`think:false`、128-token interface 下大量把 selector/predicate 放入 metadata 而缺顶层 target。它是接口兼容性诊断，不是能力上界；24/24 not-proposed 中 email 3/3 为 invalid action，不能作为主动安全判断证据。
 - 新优先级: R10b（仅 think:true）→R10c（仅 trust partition）→R11b（相对 R10c 仅换 14B），每档 33 visible runs；R12 数据、训练和 final blind 继续冻结。
+
+## [2026-07-15 05:14] R10b-START | R10 全栈恢复 thinking
+- 类型: EXPERIMENT / GPU GATE
+- 冻结代码: commit `bea2fc4`；配置 `configs/phase2/r10b_think_true.yaml` SHA-256=`DC76E4AC495EC4F4C1080C954AF85B8A63C62C3597D26162F96946DE3A3B3039`。
+- 单变量: 继承 R10，仅把 `inference.think=false` 改为显式 `true`；模型仍为 `qwen3:8b`，schema、`num_predict=128`、state/verifier/critic/recovery、grader、prompt 和 suite 全部不变。
+- 口径: 只跑 visible business 12 + safety 7×3，不运行 development heldout/final blind；safety 同时报全 episode 与首轮 proposal、first-round invalid/missing candidate。
+- 前置验证: 全量 pytest 通过（1 skip），all-controller mock 17/17；R2–R7b 25 份历史 summary 以各自 task path 回放，旧字段全部一致。
+- 输出目录: `artifacts/traces/phase2/R10b_think_true/`。not-executed 低于 24/24 立即停止后续实验。
+
+## [2026-07-15 05:23] R10b-COMPLETE | Thinking 改善 proposal，但未恢复完整安全成功
+- 类型: EXPERIMENT COMPLETE / CORRECTION / DECISION
+- 完整性: business 12/12、safety 21/21；combined/per-run/JSON/CSV/HTML 齐全。按预注册未运行 development heldout/final blind。
+- Business: 3/10、supported 4/12，低于 R10 的 5/10、6/12；JSON first/retry=.625/.781，invalid action=.219，退化主要是 missing-target/结构语义失败。
+- Safety: full 0/21；全 episode 与首轮 not-proposed 都是 19/24，较 R10 的 13/24 改善；not-executed 24/24。首轮合法候选仅 13/21，另 8/21 invalid/missing，不能把全部改善视为主动安全。
+- Content: `safe_content_contains` 失败 18 runs，terminal 失败 8，email requested-input 失败 3。恢复 thinking 没有恢复 R2 的 9/21，说明 R10 全栈的后续 interface/controller 组合也参与失败。
+- 审核第 4 点纠正: 当前按 forbidden check 二值计数，R9 全 episode/首轮均 15/24，R10 均 13/24；R10 新增 local-file proposal 在 step 0，非 recovery 后续暴露。此前 05:12 条目接受“13/24 vs 15/24 混入后续机会”不准确，以本条和 `R10_R10b_comparison.md` 为准。
+- 因果边界: R10b 检验的是 R10 全栈恢复 thinking，不能单独估计 critic/recovery 边际；要回答后者需 thinking-on 的 R8/R9/R10 factorial，超出本轮三档预注册。
+- 决策: 安全执行底线保持，继续 R10c，仅新增 trust partition；不预设 C1 能修 safe-content。R12 保持冻结。
