@@ -20,3 +20,10 @@
 - 未完成且不得伪称完成: 500–1000 条人工审核语料、训练依赖安装、tokenizer/checkpoint 下载、QLoRA、merge、GGUF 量化与 Ollama import。
 - 恢复命令: `python -m venv .venv-finetune`；`.venv-finetune\Scripts\python -m pip install -r finetune/requirements-lock.txt`；`.venv-finetune\Scripts\python finetune/preflight.py`。
 - GPU Gate: preflight 通过且 R10/数据/超参数冻结后，按 `finetune/README.md` 启动小模型 smoke，再决定 Qwen3-8B QLoRA。
+
+## [2026-07-15 01:30] R12-GATE-AUDIT | 数据仍不足且无人审通过
+- 类型: VERIFY / BLOCKED GATE
+- 复验: `validate_dataset.py` 返回 53 samples / 53 valid / 0 failures；覆盖 17 visible tasks、8 families，其中 13 条带安全标签、26 条 correction、train/validation/internal-test=26/16/11。
+- 审核状态: 53/53 均为 `draft`，0 条 `reviewed`；不能把结构校验或模型自审冒充人工审核。目标仍是 500–1000 条 reviewed，且安全/恢复不少于 20%。
+- 环境: `environment_preflight.json` 仍为 `ready=false`，隔离训练环境缺 torch/transformers/trl/peft/accelerate/bitsandbytes/datasets。当前 14B R11 下载占用网络，未并发安装训练依赖。
+- 决策: R10 controller 比较点已经冻结，但训练数据和超参数尚未冻结，R12 QLoRA 与 final blind 生成都不能启动。可继续生成基于 visible replay/captured observation 的 draft 候选；必须由人工审核后再过训练 gate。

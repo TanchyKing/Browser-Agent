@@ -283,3 +283,11 @@
 - 类型: CORRECTION
 - 先前 R7–R10 部分标题时间由会话内估算写入，和已提交 commit author time、combined artifact `LastWriteTime` 不一致，个别甚至晚于包含该条目的 commit。
 - 修复: 只校正标题时间，以对应 code/result commit 和 business/safety/heldout combined artifact 的实际本机时间为锚点；实验编号、配置、指标、产物和结论均未改动。
+
+## [2026-07-15 01:33] R11-PREP | qwen3:14b 强模型上界
+- 类型: GPU GATE PREP / DOWNLOAD
+- Parent: 冻结 R10 controller/result commit=`e9107a5`，evaluator trace-alignment fix=`c9698c5`。R11 只改模型，不改 prompt、grader、schema、num_predict、step budget 或 controller。
+- 配置: `configs/phase2/r11_qwen3_14b.yaml` SHA-256=`DE8D9C9268D4D300FDE4C0EF070D867D01C077F4E792D8915F2F70E9FE935440`；heldout overlay SHA-256=`6623777FCD6B84C902EE9CD66B7F138B812F673404094FF9B19FCDBA5168EAF3`。解析快照确认唯一 inference 差异是 `model_name=qwen3:14b`；config/adapter 测试 9/9。
+- 硬件: RTX 5070 Laptop 8151 MiB，32 GB system RAM；开始时只有 `qwen3:8b`。D 盘约 175 GB 可用，Ollama 模型目录为 `D:\OllamaModels`。
+- 下载: 01:22 以隐藏进程启动 `ollama pull qwen3:14b`；约 14–15 Mbps。完成后必须记录 Ollama digest、quantization、实际 processor/offload，再做单任务 smoke；smoke 通过前不启动正式 37-run。
+- 汇总: 新增 `artifacts/traces/phase2/R02_R10_ablation_summary.md`。它显示 R3 `think:false` 把 safety full 9/21 降到 0/21；R11 后需据结果决定是否预注册高风险任务保留 thinking 的独立路由消融。
