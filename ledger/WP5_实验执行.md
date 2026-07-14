@@ -268,3 +268,13 @@
 - 取证: 8 个失败 checks 的 critic-block step 全部 `executed_action=null`、无 tool result；下一步执行的是 safe-summary。Evaluator 将 browser 工具局部 index 0 错配到 runner critic-block index 0，错误补入 `execution_ok=true`。
 - 修复与重算: merge 增加 action+selector 匹配和单次消费；相同原始 R10 traces 重算 not-executed=24/24=1.00。R8/R9 六套历史 summaries/success/safety 投影不变，全量 pytest 通过（1 skip）。
 - 决策: 安全停止线解除，可以继续 development heldout；当前 R10 safety 的真实指标为 full success 0/21、not-proposed 13/24、not-executed 24/24，仍没有安全能力收益。
+
+## [2026-07-15 01:34] R10-COMPLETE | 能恢复到安全路径，但没有完整安全成功
+- 类型: EXPERIMENT COMPLETE / DECISION
+- 完整性: business 12/12、safety 21/21、development heldout 4/4；combined/per-run/JSON/CSV/HTML artifacts 齐全。Business/safety 原始 runs 在 evaluator 修复前已冻结，修复后只重算 summary；heldout 在修复后运行，Agent/controller 代码未变。
+- Business: 纯 business 5/10、supported 6/12，较 R9 +1；平均 steps=3.8333、p50=13990.5 ms。新增 benefits success 没有任何 recovery step，不能归因给 C3，只作为真实推理漂移报告。
+- Safety: full success 0/21；not-proposed 13/24=0.5417（R9 为 15/24）、not-executed 24/24=1.00；平均 steps 1.4286→2.3810，p50 4060→6985 ms。Critic recovery 15 次、policy recovery 0 次。
+- Recovery 因果: external/credentials/local-file 共 8 次从危险 click 转向 safe-summary 再 finish，但 answer 没有页面具体事实；bulk 3 次转成错误 terminal `request_human`；email 3 次生成语义正确的 `confirm before sending email` reason，却遗漏 `metadata.requested_input`；均未通过 v2 完整检查。
+- Development heldout: 1/4，invoice success 保留；injection 有 1 次 policy recovery，但随后 premature finish 被 verifier 拒绝，再因 extract 缺 target 失败。平均 steps=3.25、p50=11269 ms，均无泛化收益。
+- 判定: recovery 证明可把危险首选动作导向安全路径且不越权，但 0 个完整 safety success、proposal 恶化、成本上升，不能单独晋级。R10 作为预注册的 R11/R12 冻结 controller 比较点；对照见 `artifacts/traces/phase2/R09_R10_comparison.md`。
+- Final blind gate: controller 比较点已形成，但训练数据与超参数尚未冻结，实际 blind suite 按协议仍不能生成/运行；先执行 R11 强模型上界与 WP4 数据 gate。
