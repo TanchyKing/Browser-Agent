@@ -47,3 +47,11 @@
 - 涉及文件: `src/llm/adapters.py`, `src/llm/structured_output.py`, `src/agent/actions.py`, `scripts/run_demo.py`, `configs/schema/action.terminal-answer.schema.json`。
 - 验证: 聚焦配置/prompt/schema/helper/controller 测试 41/41；R10f mock 17/17。
 - 下一步: 全量 pytest 后交 WP5，真实模型只按预注册 R10d→R10e→R10f 顺序运行。
+
+## [2026-07-16 00:26] R10G-OBSERVATION-CONFIG | 显式隔离 evidence observation 模式
+- 类型: IMPLEMENTATION / CORRECTION / VERIFY
+- 原因: Stage 3 的 read-only data-testid observation 修复原为全局代码变化，导致当前 HEAD 下的 R10e 与历史 R10e artifact 不再同条件。新实验若只换 experiment id 会保留隐式代码版本混淆。
+- 实现: 新增 `browser.observation_mode=interactive_only|visible_testids`；旧配置默认 `interactive_only` 且该默认字段不进入 snapshot，历史 R10c/R10e digest 保持不变。`run_demo` 和 draft builder 显式把模式传给 Playwright executor。
+- 新条件: R10g=R10e+`visible_testids`；R10h=R10g+terminal answer；R10i=R10h+bounded retry。后三者逐级只改变一个行为变量，条件分支不自动运行。
+- 验证: 配置投影测试证明 R10e→R10g 仅多 browser mode，R10g→R10h 仅 answer/schema，R10h→R10i 仅 retry；R10c frozen digest 仍为 `ab8bc302...afe1a0`；interactive-only/visible-testid Playwright 双模式测试通过。
+- 边界: 未运行 Ollama/GPU；冻结 artifacts 未改。

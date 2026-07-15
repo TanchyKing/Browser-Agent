@@ -39,6 +39,7 @@ from src.experiment_config import load_experiment_config, load_suite_manifest
 from src.llm.structured_output import observation_grounded_schema
 from src.task_contract import TaskContract
 from finetune.split_dataset import split_samples
+from finetune.interface_rendering import render_completion, semantic_completion
 
 
 SAFETY_PREFIXES = ("resist_prompt_injection_", "sensitive_email_")
@@ -216,6 +217,7 @@ def _sample_id(payload: dict[str, Any], variant_name: str) -> str:
             "template_id": payload["template_id"],
             "observation": payload["observation"],
             "completion": payload["completion"],
+            "semantic_completion": payload["semantic_completion"],
             "variant": variant_name,
             "provenance": payload["provenance"],
         },
@@ -235,7 +237,11 @@ def build_samples(config_path: Path, suite_path: Path) -> list[dict[str, Any]]:
     base_schema = json.loads(schema_path.read_text(encoding="utf-8"))
     samples: list[dict[str, Any]] = []
 
-    with PlaywrightBrowserExecutor(headless=True, timeout_ms=5000) as executor:
+    with PlaywrightBrowserExecutor(
+        headless=True,
+        timeout_ms=5000,
+        include_readonly_testid_nodes=(config.browser.observation_mode == "visible_testids"),
+    ) as executor:
         for task_id in suite.task_ids:
             task = read_task(
                 task_id,
@@ -290,7 +296,7 @@ def build_samples(config_path: Path, suite_path: Path) -> list[dict[str, Any]]:
                         after = copy.deepcopy(state_after)
                         before["task_goal"] = instruction
                         after["task_goal"] = instruction
-                        completion = {
+                        base_completion = {
                             "action": action.action,
                             "target": action.target,
                             "value": action.value,
@@ -298,6 +304,8 @@ def build_samples(config_path: Path, suite_path: Path) -> list[dict[str, Any]]:
                             "risk_level": action.risk_level,
                             "metadata": dict(action.metadata),
                         }
+                        semantics = semantic_completion(base_completion)
+                        completion = render_completion(base_completion, semantics, "r10e")
                         labels = ["safe_behavior"] if _is_safety(task_id) else []
                         if variant_name != "canonical":
                             labels.append("recovery_or_format_correction")
@@ -324,6 +332,7 @@ def build_samples(config_path: Path, suite_path: Path) -> list[dict[str, Any]]:
                             "tools_schema": turn_schema,
                             "candidate_snapshot": candidates,
                             "completion": completion,
+                            "semantic_completion": semantics,
                             "tool_result": {**copy.deepcopy(result), "state_before": before, "state_after": after},
                             "safety_labels": labels,
                             "correction_for": None if variant_name == "canonical" else variant_name,
@@ -354,6 +363,9 @@ def write_review_queue(path: Path, samples: list[dict[str, Any]]) -> None:
                 "source_task_id",
                 "split",
                 "correction_for",
+                "action",
+                "semantic_action_reason",
+                "semantic_user_visible_result",
                 "decision",
                 "required_changes",
                 "reviewer",
@@ -368,6 +380,9 @@ def write_review_queue(path: Path, samples: list[dict[str, Any]]) -> None:
                     "source_task_id": sample["source_task_id"],
                     "split": sample["split"],
                     "correction_for": sample.get("correction_for") or "canonical",
+                    "action": sample["completion"]["action"],
+                    "semantic_action_reason": sample["semantic_completion"]["action_reason"],
+                    "semantic_user_visible_result": sample["semantic_completion"]["user_visible_result"] or "",
                     "decision": "",
                     "required_changes": "",
                     "reviewer": "",
@@ -407,6 +422,18 @@ def write_manifest(
         "split_counts": dict(sorted(split_counts.items())),
         "action_counts": dict(sorted(action_counts.items())),
         "correction_samples": sum(item.get("correction_for") is not None for item in samples),
+        "semantic_terminal_samples": sum(
+            item["completion"]["action"] in {"finish", "request_human", "refuse"}
+            for item in samples
+        ),
+        "interface_rendering": {
+            "canonical_review_interface": "semantic_completion",
+            "supported_training_interfaces": ["r10e", "r10f"],
+        },
+        "observation_dependency": {
+            "mode": load_experiment_config(config_path).browser.observation_mode,
+            "note": "draft observations include visible read-only data-testid nodes and align with R10g, not frozen R10d/R10e/R10f artifacts",
+        },
         "source_boundary": "visible local fixtures only; development heldout and final blind excluded",
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -414,7 +441,7 @@ def write_manifest(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=Path, default=Path("configs/phase2/r10e_prompt_v2.yaml"))
+    parser.add_argument("--config", type=Path, default=Path("configs/phase2/r10g_observation_fix.yaml"))
     parser.add_argument("--suite-manifest", type=Path, default=Path("configs/suites/phase2_visible17.json"))
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--review-queue", type=Path, required=True)

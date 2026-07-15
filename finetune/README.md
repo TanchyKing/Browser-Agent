@@ -15,6 +15,7 @@ Current grounded draft build (visible fixtures only):
 
 ```powershell
 python -B finetune/build_draft_corpus.py `
+  --config configs/phase2/r10g_observation_fix.yaml `
   --out finetune/data/draft/visible_step_drafts_split.jsonl `
   --review-queue finetune/data/review_queue.csv `
   --manifest finetune/data/draft/visible_step_drafts_manifest.json
@@ -22,6 +23,15 @@ python -B finetune/validate_dataset.py --input finetune/data/draft/visible_step_
 ```
 
 This build is deterministic and remains entirely `draft`. See `REVIEW_QUEUE_GUIDE.md`; do not run `prepare_sft.py` for training until a separate reviewed dataset exists.
+
+The canonical review dataset stores interface-neutral `semantic_completion` fields. After human review, render the same approved semantics to either deployment interface:
+
+```powershell
+python -B finetune/prepare_sft.py --input finetune/data/reviewed/visible_step_reviewed.jsonl --out finetune/data/processed/sft_r10e.jsonl --interface r10e
+python -B finetune/prepare_sft.py --input finetune/data/reviewed/visible_step_reviewed.jsonl --out finetune/data/processed/sft_r10f.jsonl --interface r10f
+```
+
+The 588-row corpus uses R10g visible-testid observations. It must not be described as a replay of the frozen pre-fix R10e artifact.
 
 Before training, create an isolated environment and run `preflight.py`. The current base Python environment intentionally does not contain the training stack.
 

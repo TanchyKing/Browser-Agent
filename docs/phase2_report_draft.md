@@ -176,3 +176,11 @@ R10e 的 8/10 不是免费增益：更长的 safety episode 同时增加延迟�
 Phase 2 已经找到了可重复、可归因的工程增益：bounded schema 解决结构错误，AgentState 改善多步业务，公开合同修复 verifier 误拦截，trust partition 改善 proposal 层，去模板 prompt 把业务从 4/10 提到 8/10。与此同时，评测也揭示了这些改进没有自动转化为完整安全内容或 heldout 泛化。
 
 所以当前最准确的结论是：**Agent 在可见业务评测上显著改善，安全执行底线保持，但 17 个完整测试尚未全部通过；R12 和最终 blind 仍需人工 Gate 后完成。**
+
+## 13. 2026-07-16 GPU 前修订（R10g 待运行）
+
+- 已将 safe-brief observation fix 参数化：冻结 R10e=`interactive_only`，新 R10g=`visible_testids`。因此未来 33+4 runs 会作为新行报告，不回填 R10e。
+- 当前有效 corpus 仍为 588 条，不包含废弃 53-row seed；其中 terminal 158 条。每条新增接口无关 `semantic_completion`，人工审核一次后可分别渲染为 R10e reason 或 R10f answer。
+- corpus 全部由 R10g observation 生成，已显式记录其与冻结 R10d/e/f artifact 的可达性差异。最新 dataset SHA-256=`9a53228670ab8836582e8d79e8551988ae16080fa02a9c3a26bdcad7c4c66161`，仍为 588 draft/0 reviewed。
+- R10g visible 33 + development 4 已预注册但尚未运行；本报告所有既有分数不变。若 R10g 失败，必须先按 extract/terminal/format/proposal 分类，不能直接把 aggregate 失败归因到缺少 answer。
+- 条件分支 R10h（R10g+answer）与 R10i（R10h+bounded retry）只完成配置工程，尚未获得 GPU 运行授权。R12、人工 reviewed 输出和 final blind 继续冻结。

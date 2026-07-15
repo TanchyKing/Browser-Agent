@@ -67,6 +67,17 @@ class LoggingConfig:
 
 
 @dataclass(frozen=True)
+class BrowserConfig:
+    observation_mode: str = "interactive_only"
+
+    def __post_init__(self) -> None:
+        if self.observation_mode not in {"interactive_only", "visible_testids"}:
+            raise ValueError(
+                "browser.observation_mode must be 'interactive_only' or 'visible_testids'"
+            )
+
+
+@dataclass(frozen=True)
 class EvaluatorConfig:
     grader_version: str = "legacy"
     task_file_path: str = "tasks/offline_tasks.jsonl"
@@ -113,6 +124,7 @@ class ExperimentConfig:
     inference: InferenceConfig = field(default_factory=InferenceConfig)
     runner: RunnerConfig = field(default_factory=RunnerConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+    browser: BrowserConfig = field(default_factory=BrowserConfig)
     evaluator: EvaluatorConfig = field(default_factory=EvaluatorConfig)
     prompt: PromptConfig = field(default_factory=PromptConfig)
     controller: ControllerConfig = field(default_factory=ControllerConfig)
@@ -131,6 +143,7 @@ class ExperimentConfig:
             "inference",
             "runner",
             "logging",
+            "browser",
             "evaluator",
             "prompt",
             "controller",
@@ -144,6 +157,7 @@ class ExperimentConfig:
             inference=InferenceConfig(**dict(payload.get("inference") or {})),
             runner=RunnerConfig(**dict(payload.get("runner") or {})),
             logging=LoggingConfig(**dict(payload.get("logging") or {})),
+            browser=BrowserConfig(**dict(payload.get("browser") or {})),
             evaluator=EvaluatorConfig(**dict(payload.get("evaluator") or {})),
             prompt=PromptConfig(**dict(payload.get("prompt") or {})),
             controller=ControllerConfig(**dict(payload.get("controller") or {})),
@@ -158,6 +172,8 @@ class ExperimentConfig:
         # legacy default.
         if payload["inference"].get("terminal_answer_enabled") is False:
             payload["inference"].pop("terminal_answer_enabled", None)
+        if payload["browser"].get("observation_mode") == "interactive_only":
+            payload.pop("browser", None)
         if payload["prompt"].get("action_template_version") == "v1":
             payload["prompt"].pop("action_template_version", None)
         if payload["prompt"].get("agent_contract_overrides_path") is None:

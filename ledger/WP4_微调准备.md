@@ -44,3 +44,13 @@
 - 审核: `review_queue.csv` 588 行，decision 全空；dataset 588/588=`draft`、0 reviewed。新增 `REVIEW_QUEUE_GUIDE.md` 与安全的独立输出脚本，只有明确人工 approve 才能在新文件中标 reviewed。
 - 回归: pytest collected 130，129 passed/1 environment skip；legacy mock 17/17，R10e mock 17/17。
 - Gate: 数量门槛已达到，但人工门禁完全未通过；不得启动 QLoRA、不得准备训练用 reviewed SFT、不得生成或运行 final blind。
+
+## [2026-07-16 00:26] SEMANTIC-DUAL-RENDER | 588 条单次人审语义层与双接口渲染
+- 类型: DATA SCHEMA / IMPLEMENTATION / VERIFY / CORRECTION
+- 口径: 当前唯一审核/训练候选仍是 588 条；历史 53-row seed 不合并。588 条中 terminal=158，不再使用两文件 641/175 的错误口径。
+- 语义层: 每条新增 `semantic_completion.action_reason`；terminal 另含 `user_visible_result`。canonical completion 保持 R10e 视图，validator 强制 terminal reason 与审核事实一致，防止界面序列化漂移。
+- 双渲染: `prepare_sft.py --interface r10e` 把审核事实写入 reason；`--interface r10f` 写入独立 answer 并同步切换 terminal-answer tools schema。全 588 条两种渲染均通过 schema，R10e terminal answer=0/158，R10f=158/158，非终端 answer=0。
+- Observation 依赖: corpus 以 R10g `visible_testids` 真实 Playwright replay 重建，与冻结 R10d/e/f observation 不一致；manifest 和 DATASET_CARD 已显式标注。
+- 数据: 仍为 588 draft/0 reviewed，business 458、safety/recovery 130、split 486/68/34；新 dataset SHA-256=`9A53228670AB8836582E8D79E8551988AE16080FA02A9C3A26BDCAD7C4C66161`，queue SHA-256=`0F6D4F1CB150869AA7E4E14467E0E3E44C052BE96E57C89C338AA860E0994977`；两次独立生成完全一致。
+- 审核: review queue 新增只读 action/semantic 两列，decision 仍 588/588 空白。渲染不产生 reviewed 状态，不替代人工判断。
+- 边界: 未准备正式 SFT reviewed 文件、未安装训练栈、未训练、未读取 heldout/blind 数据。

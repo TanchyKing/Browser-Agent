@@ -63,6 +63,16 @@ class AgentContractLeakTests(unittest.TestCase):
             "r10f_terminal_answer_heldout.yaml"
         )
 
+    def test_r10g_and_conditional_contracts_do_not_copy_evaluator_selectors(self):
+        for config_name in (
+            "r10g_observation_fix.yaml",
+            "r10g_observation_fix_heldout.yaml",
+            "r10h_terminal_answer_observation_fix.yaml",
+            "r10i_terminal_answer_bounded_retry.yaml",
+        ):
+            with self.subTest(config_name=config_name):
+                self._assert_config_contracts_do_not_copy_evaluator_selectors(config_name)
+
 
 if __name__ == "__main__":
     unittest.main()

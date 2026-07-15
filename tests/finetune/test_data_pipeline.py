@@ -4,6 +4,8 @@ from finetune.export_mock_traces import FAILED_PHASE1_BUSINESS
 from finetune.apply_review_queue import apply_decisions
 from finetune.split_dataset import split_samples
 from finetune.validate_dataset import validate_sample
+from finetune.interface_rendering import render_sample
+from finetune.prepare_sft import prepare_records
 
 
 def sample(template="family"):
@@ -20,6 +22,7 @@ def sample(template="family"):
         "tools_schema": {},
         "candidate_snapshot": {"selectors": ["#safe"]},
         "completion": {"action": "click", "target": "#safe", "value": None, "reason": "click safe", "risk_level": "low", "metadata": {}},
+        "semantic_completion": {"action_reason": "click safe", "user_visible_result": None},
         "tool_result": {"ok": True},
         "safety_labels": [],
         "correction_for": None,
@@ -76,6 +79,93 @@ class DataPipelineTests(unittest.TestCase):
 
         self.assertEqual(output[0]["review_status"], "reviewed")
         self.assertEqual(output[1]["review_status"], "draft")
+
+    def test_terminal_semantics_render_to_r10e_and_r10f_without_second_label(self):
+        item = sample()
+        item["completion"] = {
+            "action": "finish",
+            "target": None,
+            "value": None,
+            "reason": "14 active records remain unchanged.",
+            "risk_level": "low",
+            "metadata": {},
+        }
+        item["semantic_completion"] = {
+            "action_reason": "Return the observed result.",
+            "user_visible_result": "14 active records remain unchanged.",
+        }
+        item["tools_schema"] = {
+            "type": "object",
+            "required": ["action", "reason"],
+            "properties": {
+                "action": {"const": "finish"},
+                "reason": {"type": "string"},
+                "target": {"type": ["string", "null"]},
+                "value": {},
+                "risk_level": {"type": "string"},
+                "metadata": {"type": "object"},
+            },
+            "additionalProperties": False,
+        }
+
+        r10e = render_sample(item, "r10e")
+        r10f = render_sample(item, "r10f")
+
+        self.assertNotIn("answer", r10e["completion"])
+        self.assertEqual(r10e["completion"]["reason"], item["semantic_completion"]["user_visible_result"])
+        self.assertEqual(r10f["completion"]["reason"], "Return the observed result.")
+        self.assertEqual(r10f["completion"]["answer"], item["semantic_completion"]["user_visible_result"])
+        self.assertIn("answer", r10f["tools_schema"]["properties"])
+
+    def test_terminal_semantics_must_match_canonical_r10e_reason(self):
+        item = sample()
+        item["completion"].update({"action": "finish", "target": None, "reason": "generic"})
+        item["semantic_completion"] = {
+            "action_reason": "Return the observed result.",
+            "user_visible_result": "specific fact",
+        }
+
+        self.assertIn(
+            "canonical R10e terminal reason must equal semantic user_visible_result",
+            validate_sample(item),
+        )
+
+    def test_prepare_sft_renders_both_interfaces_from_one_reviewed_sample(self):
+        item = sample()
+        item["review_status"] = "reviewed"
+        item["completion"] = {
+            "action": "finish",
+            "target": None,
+            "value": None,
+            "reason": "14 active records remain unchanged.",
+            "risk_level": "low",
+            "metadata": {},
+        }
+        item["semantic_completion"] = {
+            "action_reason": "Return the observed result.",
+            "user_visible_result": "14 active records remain unchanged.",
+        }
+        item["tools_schema"] = {
+            "type": "object",
+            "required": ["action", "reason"],
+            "properties": {
+                "action": {"const": "finish"},
+                "reason": {"type": "string"},
+                "target": {"type": ["string", "null"]},
+                "value": {},
+                "risk_level": {"type": "string"},
+                "metadata": {"type": "object"},
+            },
+            "additionalProperties": False,
+        }
+
+        r10e = prepare_records([item], interface="r10e")
+        r10f = prepare_records([item], interface="r10f")
+
+        self.assertEqual(r10e[0]["interface"], "r10e")
+        self.assertNotIn('"answer"', r10e[0]["text"].split("Assistant action:\n", 1)[1])
+        self.assertEqual(r10f[0]["interface"], "r10f")
+        self.assertIn('"answer":"14 active records remain unchanged."', r10f[0]["text"])
 
 
 if __name__ == "__main__":

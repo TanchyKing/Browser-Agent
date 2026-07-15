@@ -256,3 +256,13 @@ RUN 条目（WP5）额外要求：完整开关快照、run artifact 路径、指
 | 11. 来源、泛化、安全结论 | 阶段性完成 | 报告明确 visible 增益、heldout 缺口与安全三层边界；最终结论待 blind |
 
 无人值守可做的阶段 0–4 已完成。剩余工作严格限定为：人工审核数据；审核冻结后授权 R12 QLoRA；模型与方案冻结后授权 final blind。当前不满足 Phase 2 最终结项条件，也不满足“17 个完整测试全部通过”。
+
+## 12. 2026-07-16 GPU 前工程 Gate（追加）
+
+- [x] 将 observation 修复参数化为 `interactive_only` / `visible_testids`，历史 R10e 与新 R10g 不再依赖隐式代码版本区分。
+- [x] 冻结 R10g visible 33 + development 4 的新条件；不回填 R10e，安全停止线仍为 not-executed=1.0。
+- [x] 建立 588 条统一 `semantic_completion` 人审层及 R10e/R10f 双渲染；历史 53 条 seed 继续废弃。
+- [x] 明示 corpus 在 observation fix 后生成，与 R10g 对齐、与冻结 R10d/e/f observation 不一致。
+- [ ] 用户释放 GPU 后执行 R10g 37 runs；在结果出来前不审核、不训练、不运行条件分支 R10h/R10i。
+
+条件分支已预注册但不自动触发：只有 R10g trace 证明剩余问题属于 terminal interface，才运行 R10h（只加 answer）；只有 R10h 仍以 missing-answer 为主，才运行 R10i（只把 retry 改为 bounded）。未提取 safe brief、未 finish、重复动作或 proposal 问题不能靠 answer 路径解释。

@@ -22,9 +22,16 @@ from .tools import (
 class PlaywrightBrowserExecutor:
     """Minimal synchronous Playwright executor for browser tool actions."""
 
-    def __init__(self, *, headless: bool = True, timeout_ms: int = 5000) -> None:
+    def __init__(
+        self,
+        *,
+        headless: bool = True,
+        timeout_ms: int = 5000,
+        include_readonly_testid_nodes: bool = False,
+    ) -> None:
         self.headless = headless
         self.timeout_ms = timeout_ms
+        self.include_readonly_testid_nodes = include_readonly_testid_nodes
         self._playwright: Any | None = None
         self._browser: Any | None = None
         self._context: Any | None = None
@@ -92,11 +99,13 @@ class PlaywrightBrowserExecutor:
         """Return a compact page snapshot."""
 
         page = self.page
-        # Include visible data-testid nodes, not only interactive controls. The
-        # extract_text action needs grounded selectors for read-only evidence
-        # such as <p data-testid="safe-brief">. These are page-visible DOM
-        # selectors, not evaluator-private success criteria.
-        elements = page.locator("a, button, input, select, textarea, [data-testid]").evaluate_all(
+        selector = "a, button, input, select, textarea"
+        if self.include_readonly_testid_nodes:
+            # R10g opt-in: expose visible data-testid nodes so extract_text can
+            # ground read-only evidence such as <p data-testid="safe-brief">.
+            # These remain page-visible DOM selectors, not evaluator oracles.
+            selector += ", [data-testid]"
+        elements = page.locator(selector).evaluate_all(
             r"""els => {
                 const cssEscape = value => {
                     if (window.CSS && window.CSS.escape) {

@@ -5,8 +5,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from finetune.interface_rendering import semantic_completion
 
 
 FAILED_PHASE1_BUSINESS = {
@@ -44,6 +52,30 @@ def export_samples(runs_path: Path, tasks_path: Path) -> list[dict[str, Any]]:
                 continue
             request = attempts[-1].get("request") or {}
             identity = f"{run.get('run_id')}:{step.get('step_index')}:{task_id}"
+            action_type = str(step.get("action_type") or "")
+            action_reason = str(step.get("reason") or "correct next action")
+            user_visible_result = str(step.get("answer") or action_reason)
+            completion = {
+                "action": action_type,
+                "target": step.get("target"),
+                "value": step.get("value"),
+                # The review dataset is canonical R10e serialization even when
+                # its source trace used R10f. Preserve the terminal semantics
+                # below, then let the renderer recreate either interface.
+                "reason": (
+                    user_visible_result
+                    if action_type in {"finish", "request_human", "refuse"}
+                    else action_reason
+                ),
+                "risk_level": step.get("risk_level") or "low",
+                "metadata": step.get("action_metadata") or {},
+            }
+            semantics = semantic_completion(completion)
+            if action_type in {"finish", "request_human", "refuse"}:
+                semantics = {
+                    "action_reason": action_reason,
+                    "user_visible_result": user_visible_result,
+                }
             samples.append(
                 {
                     "sample_id": hashlib.sha256(identity.encode("utf-8")).hexdigest(),
@@ -57,14 +89,8 @@ def export_samples(runs_path: Path, tasks_path: Path) -> list[dict[str, Any]]:
                     "agent_state": step.get("state_before"),
                     "tools_schema": request.get("action_schema") or {},
                     "candidate_snapshot": request.get("candidate_snapshot"),
-                    "completion": {
-                        "action": step.get("action_type"),
-                        "target": step.get("target"),
-                        "value": step.get("value"),
-                        "reason": step.get("reason") or "correct next action",
-                        "risk_level": step.get("risk_level") or "low",
-                        "metadata": step.get("action_metadata") or {},
-                    },
+                    "completion": completion,
+                    "semantic_completion": semantics,
                     "tool_result": step.get("tool_result") or {},
                     "safety_labels": ["safe_behavior"] if task_id.startswith(SAFETY_PREFIXES) else [],
                     "correction_for": "phase1_qwen_failure" if task_id in FAILED_PHASE1_BUSINESS else None,

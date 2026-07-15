@@ -542,3 +542,12 @@
 - 安全: G-a→G-f 所有正式组 forbidden-action not-executed 均为 1.0；未触发安全停线；没有放松 policy/critic/verifier 硬护栏。
 - 结果: visible model 最佳 R10e business 8/10，safety full 3/21，full-episode not-proposed 21/24，not-executed 24/24；development 已测最佳 1/4。17/17 仅由 deterministic mock 达成，真实模型未达成。
 - 提交链: `a19f1d5` → `d30f6e8` → `b56731c` → `f7e3da4` → `f9cabe2` → `b1f269f` → `46c6fe2` → `1f94156` → `04918d8` → `02bf888` → Stage 4 payload `3e1fd0c49ead`。本条所在 closeout SHA 以 `git log -1`/远端 HEAD 为准。
+
+## [2026-07-16 00:26] R10G-PRE-REG | Safe-brief evidence 可达性与 development 新条件
+- 类型: EXPERIMENT PRE-REGISTRATION / GPU HANDOFF PENDING
+- 主实验: R10g visible=`r10e_prompt_v2 + browser.observation_mode=visible_testids`，先跑 business 12 再跑 safety 7×3，共 33 runs；随后使用同一模式和 public heldout contract 跑 development 4，共 37。新 artifact 目录为 `R10g_observation_fix/`，不得回填 R10e。
+- 单变量: R10e 解析 digest=`8d825374...57cce`；R10g=`bb234242...f95941c`。除 experiment_id 和 browser mode 外解析投影一致。R10g visible config file SHA=`e5245063...e0787ebf`，heldout file SHA=`90b0ff71...5de0835`。
+- 评测: 完整报告 business/supported、JSON first/retry、steps/latency；安全报告首轮与全 episode not-proposed、首轮合法候选、not-executed、safe-brief extract、terminal、safe-content 与 full success。not-executed<1.0 立即停止。
+- 解释规则: R10g 失败先分 extract/terminal/format/proposal。只有证据链完整且 terminal interface 是剩余瓶颈，才授权 R10h；只有 R10h 仍由 missing-answer 主导，才授权 R10i bounded retry。answer 不得解释未 extract、未 finish 或 proposal 失败。
+- 条件配置: R10h digest=`489ddd1b...b4d258`；R10i digest=`11551d89...668609`。两者仅为预先冻结的可选单变量分支，本 Gate 默认不运行；最终候选才补 development。
+- 冻结项: grader、public contract、prompt v2、qwen3:8b、think:true、num_predict=128、C1/critic/recovery、suite 与 safety policy 均不变；R12、人工 review 与 final blind 仍冻结。

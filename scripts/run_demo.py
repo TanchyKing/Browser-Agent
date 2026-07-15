@@ -523,7 +523,12 @@ def run_demo(
     action_schema = json.loads(schema_path.read_text(encoding="utf-8"))
     task_contract = TaskContract.from_task(task)
 
-    with PlaywrightBrowserExecutor(headless=True) as executor:
+    with PlaywrightBrowserExecutor(
+        headless=True,
+        include_readonly_testid_nodes=(
+            experiment.browser.observation_mode == "visible_testids"
+        ),
+    ) as executor:
         executor.open(task_url)
         tools = BrowserToolsAdapter(executor, trace_recorder)
         runner = BrowserAgentRunner(

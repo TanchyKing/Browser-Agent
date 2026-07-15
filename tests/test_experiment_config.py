@@ -93,6 +93,7 @@ class ExperimentConfigTests(unittest.TestCase):
         r10d = load_experiment_config(ROOT / "configs" / "phase2" / "r10d_contract_fixes.yaml")
         r10e = load_experiment_config(ROOT / "configs" / "phase2" / "r10e_prompt_v2.yaml")
         r10f = load_experiment_config(ROOT / "configs" / "phase2" / "r10f_terminal_answer.yaml")
+        r10g = load_experiment_config(ROOT / "configs" / "phase2" / "r10g_observation_fix.yaml")
 
         self.assertIsNone(r10c.prompt.agent_contract_overrides_path)
         self.assertEqual(r10d.prompt.agent_contract_overrides_path, "tasks/phase2_agent_contract_v2.json")
@@ -107,6 +108,14 @@ class ExperimentConfigTests(unittest.TestCase):
         self.assertEqual(r10f.inference.model_name, "qwen3:8b")
         self.assertTrue(r10f.inference.think)
         self.assertTrue(r10f.controller.trust_partition_enabled)
+        self.assertEqual(r10e.browser.observation_mode, "interactive_only")
+        self.assertEqual(r10f.browser.observation_mode, "interactive_only")
+        self.assertEqual(r10g.browser.observation_mode, "visible_testids")
+        r10e_values = r10e.values()
+        r10g_values = r10g.values()
+        r10e_values["experiment_id"] = r10g_values["experiment_id"]
+        r10g_values.pop("browser")
+        self.assertEqual(r10e_values, r10g_values)
         self.assertEqual(
             r10c.digest().upper(),
             "AB8BC302B27E04985D078AB0F884F7D699859EC1A6347A5C96EFF95A07AFE1A0",
@@ -130,6 +139,35 @@ class ExperimentConfigTests(unittest.TestCase):
         self.assertTrue(r10c.controller.trust_partition_enabled)
         self.assertTrue(r10b.inference.think)
         self.assertTrue(r10c.inference.think)
+
+    def test_r10g_heldout_preserves_observation_fix_and_uses_public_contract(self):
+        heldout = load_experiment_config(
+            ROOT / "configs" / "phase2" / "r10g_observation_fix_heldout.yaml"
+        )
+
+        self.assertEqual(heldout.browser.observation_mode, "visible_testids")
+        self.assertEqual(heldout.evaluator.task_file_path, "tasks/development_heldout_tasks.jsonl")
+        self.assertEqual(
+            heldout.prompt.agent_contract_overrides_path,
+            "tasks/phase2_development_agent_contract_v2.json",
+        )
+
+    def test_conditional_terminal_configs_keep_single_variable_steps(self):
+        r10g = load_experiment_config(ROOT / "configs" / "phase2" / "r10g_observation_fix.yaml")
+        r10h = load_experiment_config(
+            ROOT / "configs" / "phase2" / "r10h_terminal_answer_observation_fix.yaml"
+        )
+        r10i = load_experiment_config(
+            ROOT / "configs" / "phase2" / "r10i_terminal_answer_bounded_retry.yaml"
+        )
+
+        self.assertFalse(r10g.inference.terminal_answer_enabled)
+        self.assertTrue(r10h.inference.terminal_answer_enabled)
+        self.assertEqual(r10g.inference.retry_prompt_mode, "legacy")
+        self.assertEqual(r10h.inference.retry_prompt_mode, "legacy")
+        self.assertEqual(r10i.inference.retry_prompt_mode, "bounded")
+        self.assertEqual(r10h.browser.observation_mode, "visible_testids")
+        self.assertEqual(r10i.browser.observation_mode, "visible_testids")
 
 
 if __name__ == "__main__":

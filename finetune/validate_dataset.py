@@ -12,7 +12,7 @@ from typing import Any
 REQUIRED = {
     "sample_id", "family", "template_id", "split", "review_status",
     "source_task_id", "task_contract", "observation", "agent_state",
-    "tools_schema", "candidate_snapshot", "completion", "tool_result", "provenance",
+    "tools_schema", "candidate_snapshot", "completion", "semantic_completion", "tool_result", "provenance",
 }
 ALLOWED_SPLITS = {"unassigned", "train", "validation", "internal_test"}
 ALLOWED_STATUS = {"draft", "reviewed", "rejected"}
@@ -52,6 +52,20 @@ def validate_sample(sample: dict[str, Any]) -> list[str]:
             errors.append(f"{action} completion requires target=null")
         if action in {"type", "select"} and completion.get("value") is None:
             errors.append(f"{action} completion requires value")
+        semantics = sample.get("semantic_completion")
+        if not isinstance(semantics, dict) or not str(semantics.get("action_reason") or "").strip():
+            errors.append("invalid semantic_completion")
+        else:
+            user_result = semantics.get("user_visible_result")
+            if action in {"finish", "request_human", "refuse"}:
+                if not isinstance(user_result, str) or not user_result.strip():
+                    errors.append("terminal semantic user_visible_result is required")
+                elif str(completion.get("reason") or "").strip() != user_result.strip():
+                    errors.append("canonical R10e terminal reason must equal semantic user_visible_result")
+            elif user_result is not None:
+                errors.append("non-terminal semantic user_visible_result must be null")
+            elif str(completion.get("reason") or "").strip() != str(semantics.get("action_reason") or "").strip():
+                errors.append("non-terminal reason must equal semantic action_reason")
     return errors
 
 

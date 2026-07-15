@@ -38,7 +38,11 @@ class PlaywrightObservationTest(unittest.TestCase):
             fixture = Path(tmp) / "selector_fixture.html"
             fixture.write_text(FIXTURE_HTML, encoding="utf-8")
 
-            with PlaywrightBrowserExecutor(headless=True, timeout_ms=5000) as executor:
+            with PlaywrightBrowserExecutor(
+                headless=True,
+                timeout_ms=5000,
+                include_readonly_testid_nodes=True,
+            ) as executor:
                 observation = executor.open(fixture)
 
                 save = next(element for element in observation.elements if element.get("testid") == "save-action")
@@ -62,6 +66,22 @@ class PlaywrightObservationTest(unittest.TestCase):
 
             self.assertTrue(result.ok, result.error)
             self.assertIn("second", result.observation.text)
+
+    def test_interactive_only_mode_excludes_readonly_testid_nodes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture = Path(tmp) / "selector_fixture.html"
+            fixture.write_text(FIXTURE_HTML, encoding="utf-8")
+
+            with PlaywrightBrowserExecutor(
+                headless=True,
+                timeout_ms=5000,
+                include_readonly_testid_nodes=False,
+            ) as executor:
+                observation = executor.open(fixture)
+
+            testids = {element.get("testid") for element in observation.elements}
+            self.assertIn("save-action", testids)
+            self.assertNotIn("safe-brief", testids)
 
     def test_strict_mode_violation_is_structured_error(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

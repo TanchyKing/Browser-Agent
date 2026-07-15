@@ -535,3 +535,34 @@ R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使
 - Development：R10b 0/4、R10c 1/4、R10f 0/4；R10d/R10e 未运行 development，不能虚构泛化分数。Stage 0 后三组使用相同无 selector public contract。
 - R12 base interface 冻结为 R10e，不启用 R10f terminal-answer schema。选择依据是 visible 8/10 与字段可用性；其安全内容、proposal 与 development 泛化缺口必须由 draft 数据和未来人工审核后的训练验证，不能提前宣称解决。
 - 截至本修订，business 目标已达；safety full 目标未达；安全执行底线保持。R12 仍因 reviewed=0 被阻断，final blind 未生成或运行。
+
+## 14. 2026-07-16 R10g 证据可达性实验与接口决策（预注册，追加）
+
+### 14.1 审计纠正与单变量边界
+
+- 有效待审核 corpus 是 588 条；历史 53 条 seed 已废弃，不得合并。588 条中 terminal 158 条，统一由 `semantic_completion` 承载人工审核事实。
+- `answer` 不是 safety content 的唯一通路：grader 同时读取 terminal `agent_answer` 和成功的 `extracted_text`。因此不在训练前机械切换到失败的 R10f 接口。
+- R10d/e/f 正式 artifact 运行时 observation 只包含交互元素；Stage 3 后才加入可见只读 `[data-testid]` 节点。新实验不得回填 R10e 行，命名为 R10g。
+- 为消除代码版本隐变量，观察模式已参数化：R10e=`browser.observation_mode=interactive_only`，R10g=`visible_testids`。两者除 `experiment_id` 与该字段外配置投影一致。
+
+### 14.2 GPU Gate G-g（待用户释放 GPU 后执行）
+
+1. **R10g visible**：以 `r10g_observation_fix.yaml` 运行冻结 12-run business 与 7×3 safety，共 33 runs；相对 R10e 唯一行为变量是 observation 中加入可见只读 data-testid 节点。
+2. **R10g development**：随后用 `r10g_observation_fix_heldout.yaml` 和冻结 4-task development manifest 跑 4 runs。它是 R10g 新条件的泛化读数，不回填历史 R10e。
+3. 每组先登记代码/config/suite digest，输出独立 `R10g_observation_fix/` artifact；不得修改 R10e/R10f 冻结 artifact。
+4. 安全停止线不变：任何 `forbidden_action_not_executed_rate < 1.0` 立即停止后续 GPU；同时报告首轮/全 episode not-proposed、首轮合法候选、safe-brief extract、terminal、safe-content、步骤与延迟。
+
+### 14.3 预注册解释与条件分支
+
+- 若 R10g 能完成 grounded `safe-brief` extract，并使 injection 的 content/full-success 相对 R10e 提升且安全底线不退化，则 R12 默认使用 **R10e 语义渲染**（终局事实进入 `reason`）。
+- 若 R10g 仍失败，必须先按 trace 区分：未提取正文、未 finish、重复/格式错误、proposal 或终局字段问题。非终局字段失败不得被解释为需要 `answer`。
+- 只有 trace 证明证据链已完整、剩余瓶颈确为 terminal interface 时，才允许进入预先准备但未授权运行的 R10h：R10g +独立 `answer`。若 R10h 仍以 missing-answer 为主，再进入 R10i：R10h + `retry_prompt_mode=bounded`。每档仍是单变量、各自重新过 not-executed 停止线；不因 aggregate 低分临场改道。
+- R10h/R10i 是否运行由 R10g 的预注册 failure taxonomy 决定，不是本轮默认 GPU 工作。若选出新接口，只对最终候选补 development 4 runs。
+
+### 14.4 单次人工审核、双接口渲染
+
+- 588 条 canonical draft 新增接口无关的 `semantic_completion.action_reason` 与 terminal `user_visible_result`；人工只审核该语义一次。
+- R10e renderer：terminal 用户事实写入 `reason`，不含 `answer`。
+- R10f renderer：短 action reason 写入 `reason`，同一审核事实写入 `answer`；工具 schema 同步切换到 terminal-answer schema。
+- renderer 只是冻结语义的序列化视图，不产生 reviewed 标记。R10g 决策后只选择训练视图，不重新标注内容。
+- 588 条均生成于 `visible_testids` observation，与 R10g 对齐；不得描述为冻结 R10e artifact 的 replay。R12、人工 reviewed 输出和 final blind 仍保持冻结。

@@ -3,7 +3,7 @@
   "title": "P3 Phase 2 Step-Level SFT Sample",
   "type": "object",
   "additionalProperties": false,
-  "required": ["sample_id", "family", "template_id", "split", "review_status", "source_task_id", "task_contract", "observation", "agent_state", "tools_schema", "candidate_snapshot", "completion", "tool_result", "provenance"],
+  "required": ["sample_id", "family", "template_id", "split", "review_status", "source_task_id", "task_contract", "observation", "agent_state", "tools_schema", "candidate_snapshot", "completion", "semantic_completion", "tool_result", "provenance"],
   "properties": {
     "sample_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "family": {"type": "string", "minLength": 1},
@@ -29,6 +29,15 @@
         "metadata": {"type": "object"}
       }
     },
+    "semantic_completion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_reason", "user_visible_result"],
+      "properties": {
+        "action_reason": {"type": "string", "minLength": 1, "maxLength": 160},
+        "user_visible_result": {"type": ["string", "null"], "maxLength": 320}
+      }
+    },
     "tool_result": {"type": "object"},
     "safety_labels": {"type": "array", "items": {"type": "string"}},
     "correction_for": {"type": ["string", "null"]},
@@ -43,5 +52,31 @@
         "source_artifact": {"type": "string"}
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "completion": {
+            "properties": {"action": {"enum": ["finish", "request_human", "refuse"]}},
+            "required": ["action"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "semantic_completion": {
+            "properties": {"user_visible_result": {"type": "string", "minLength": 1}}
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "semantic_completion": {
+            "properties": {"user_visible_result": {"type": "null"}}
+          }
+        }
+      }
+    }
+  ]
 }
