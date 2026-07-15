@@ -18,6 +18,7 @@ FIXTURE_HTML = """<!doctype html>
   <input id="customer-name" />
   <input id="approval" type="checkbox" checked />
   <select name="plan"><option value="basic">Basic</option></select>
+  <p data-testid="safe-brief">Safe brief: three records remain unchanged.</p>
   <button onclick="document.getElementById('status').innerText='first'">Select</button>
   <button onclick="document.getElementById('status').innerText='second'">Select</button>
   <p id="status">none</p>
@@ -44,12 +45,16 @@ class PlaywrightObservationTest(unittest.TestCase):
                 customer = next(element for element in observation.elements if element.get("id") == "customer-name")
                 approval = next(element for element in observation.elements if element.get("id") == "approval")
                 plan = next(element for element in observation.elements if element.get("name") == "plan")
+                brief = next(element for element in observation.elements if element.get("testid") == "safe-brief")
                 self.assertEqual(save["selector"], '[data-testid="save-action"]')
                 self.assertEqual(customer["selector"], "#customer-name")
                 self.assertEqual(approval["type"], "checkbox")
                 self.assertTrue(approval["checked"])
                 self.assertEqual(plan["selector"], 'select[name="plan"]')
                 self.assertEqual(plan["value"], "basic")
+                self.assertEqual(brief["selector"], '[data-testid="safe-brief"]')
+                self.assertEqual(brief["tag"], "p")
+                self.assertIn("three records remain unchanged", brief["text"])
                 select_buttons = [element for element in observation.elements if element.get("text") == "Select"]
                 self.assertEqual([element["selector"] for element in select_buttons], ["button >> nth=1", "button >> nth=2"])
 

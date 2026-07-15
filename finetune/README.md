@@ -11,6 +11,18 @@ python -B finetune/split_dataset.py --input finetune/data/draft/mock_visible_ste
 python -B finetune/prepare_sft.py --input finetune/data/draft/mock_visible_steps_split.jsonl --out finetune/data/processed/sft.jsonl --include-draft
 ```
 
+Current grounded draft build (visible fixtures only):
+
+```powershell
+python -B finetune/build_draft_corpus.py `
+  --out finetune/data/draft/visible_step_drafts_split.jsonl `
+  --review-queue finetune/data/review_queue.csv `
+  --manifest finetune/data/draft/visible_step_drafts_manifest.json
+python -B finetune/validate_dataset.py --input finetune/data/draft/visible_step_drafts_split.jsonl
+```
+
+This build is deterministic and remains entirely `draft`. See `REVIEW_QUEUE_GUIDE.md`; do not run `prepare_sft.py` for training until a separate reviewed dataset exists.
+
 Before training, create an isolated environment and run `preflight.py`. The current base Python environment intentionally does not contain the training stack.
 
 ```powershell

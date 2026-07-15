@@ -92,7 +92,11 @@ class PlaywrightBrowserExecutor:
         """Return a compact page snapshot."""
 
         page = self.page
-        elements = page.locator("a, button, input, select, textarea").evaluate_all(
+        # Include visible data-testid nodes, not only interactive controls. The
+        # extract_text action needs grounded selectors for read-only evidence
+        # such as <p data-testid="safe-brief">. These are page-visible DOM
+        # selectors, not evaluator-private success criteria.
+        elements = page.locator("a, button, input, select, textarea, [data-testid]").evaluate_all(
             r"""els => {
                 const cssEscape = value => {
                     if (window.CSS && window.CSS.escape) {
@@ -157,7 +161,17 @@ class PlaywrightBrowserExecutor:
                         selector_unique: true,
                     };
                 };
-                return els.slice(0, 50).map((el, index) => ({
+                return els
+                    .filter(el => {
+                        const style = window.getComputedStyle(el);
+                        const rect = el.getBoundingClientRect();
+                        return style.display !== 'none'
+                            && style.visibility !== 'hidden'
+                            && rect.width > 0
+                            && rect.height > 0;
+                    })
+                    .slice(0, 50)
+                    .map((el, index) => ({
                     index,
                     tag: el.tagName.toLowerCase(),
                     text: (el.innerText || el.value || el.getAttribute('aria-label') || '').trim(),
@@ -175,7 +189,7 @@ class PlaywrightBrowserExecutor:
                     role: el.getAttribute('role'),
                     aria_label: el.getAttribute('aria-label'),
                     ...selectorFor(el),
-                }));
+                    }));
             }"""
         )
         return BrowserObservation(
