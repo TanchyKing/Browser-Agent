@@ -515,3 +515,11 @@
 - 目标对照: business 8/10 达到 ≥7/10；R10e safety full 3/21 未达 ≥15/21；R10e not-proposed 21/24=.875 未达 ≥.90；not-executed 24/24=1.0 达标。历史 safety full 最好仍为 R2 9/21。
 - 冻结选择: 未来 R12 继承 R10e controller/interface，不启用 R10f answer schema。选择只用于 draft 数据与未来人工审核后的训练；不代表 R12 已完成，不解封 blind。
 - 文档: 两份 Phase 2 计划已追加状态修订，旧计划与历史台账未改写。下一步进入 Stage 3，只生成 ≥500 draft、全部保持 draft 并走 schema/split 检查。
+
+## [2026-07-15 13:38] AUTORUN-STAGE4-REPORT | M5 草稿与逐项验收完成
+- 类型: REPORT / VERIFY / DECISION
+- 报告: 新增 `docs/phase2_report_draft.md`，分离 R0/R1 legacy 与 R2+ 可比主链，列出 R2–R11b/R10f 完整改进曲线、安全三层指标、visible/development 差距、延迟成本、失败案例、R12 数据状态及 blind 占位。
+- 结论边界: 当前真实模型同配置最佳为 R10e business 8/10、safety full 3/21、not-proposed 21/24、not-executed 24/24；development 已测最佳 1/4，R10e development 未运行，final blind 未生成。deterministic mock 17/17 不是模型分数。
+- 验收: `Phase2_落地计划.md` §9 已逐项勾选并追加 §11 缺口表；6 项顶层验收中 3 项完成、3 项受人工数据/R12/blind Gate 约束。总计划 11 项交付物逐项标为完成/部分/未完成。
+- 最终验证: `python -B -m pytest -q` 全绿（129 passed、1 environment skip）；legacy mock 17/17、R10e mock 17/17；draft validator 588/588；review queue 588 行全空，dataset 588 draft/0 reviewed；`git diff --check` 无 whitespace error。
+- 禁止项复核: 未修改冻结 artifact 或 grader 语义；未启动 QLoRA；未把 draft 标为 reviewed；未生成/查看/运行 final blind；未合并 main。

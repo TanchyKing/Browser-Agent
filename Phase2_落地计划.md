@@ -223,12 +223,12 @@ RUN 条目（WP5）额外要求：完整开关快照、run artifact 路径、指
 
 ## 9. 验收对照（Phase 2 结束时逐项打勾）
 
-- [ ] R0–R12 完整消融表 + development held-out 差距表 + 最终 blind holdout 预注册结果
-- [ ] 四本以上 WP 台账 + `实验记录.md` 完整覆盖每个实验
-- [ ] legacy/v2 grader、contract prompt、全部 flag 可复现任意一个 R 配置
-- [ ] 安全底线全程 1.0，未放松任何硬护栏
-- [ ] 微调数据全部过审核 + 拆分校验脚本
-- [ ] 总计划 §12 的 11 项交付物齐备
+- [ ] R0–R12 完整消融表 + development held-out 差距表 + 最终 blind holdout 预注册结果（缺口：R12 与 final blind 受人工 Gate 约束；R10e 未跑 development）
+- [x] 四本以上 WP 台账 + `实验记录.md` 完整覆盖已执行实验
+- [x] legacy/v2 grader、contract prompt、全部 flag 可复现任意一个已执行 R 配置
+- [x] 安全底线全程 1.0，未放松任何硬护栏
+- [ ] 微调数据全部过审核 + 拆分校验脚本（校验脚本与 588 条 draft 已完成；人工审核 0/588）
+- [ ] 总计划 §12 的 11 项交付物齐备（当前工程交付完成，人工数据、adapter 与 final blind 未完成；详见下方 §11）
 
 ## 10. 2026-07-15 无人值守执行状态（追加）
 
@@ -238,3 +238,21 @@ RUN 条目（WP5）额外要求：完整开关快照、run artifact 路径、指
 - R10f 独立 answer 只有 4/68 terminal attempts 遵循必填字段，visible 0/10、safety 0/21、development 0/4，不晋级。
 - 后续 R12 冻结继承 R10e controller/interface（C1 + public contract + prompt v2 + reason terminal），不启用 R10f answer schema。该冻结不解除人工数据审核门禁；final blind 仍封存。
 - Stage 0 lint 证明 development 旧合同也复用了 evaluator selector，所以正式 heldout 读数统一使用无 selector public contract。原无人值守指令中“heldout 无合同条目”的前提已被实证修正。
+
+## 11. 2026-07-15 验收缺口明细（追加）
+
+| 总计划 §12 交付物 | 状态 | 证据或缺口 |
+|---|---|---|
+| 1. 可复现 baseline 与改进 artifacts | 已完成（截至 R11b/R10f） | `configs/phase2/`、`artifacts/traces/phase2/`；R12 待 Gate |
+| 2. A0 trace schema | 已完成 | raw preview、`done_reason`、token/request config 已进入 artifacts |
+| 3. 逐 run error analysis | 已完成 | 各 R summary/report 与 `R02_R10_ablation_summary.md` |
+| 4. schema-constrained Agent | 已完成 | bounded schema、retry 与 grounding tests |
+| 5. state/verifier/recovery runner | 已完成 | R7b–R10e 实现、单测与消融 |
+| 6. visible/development/final blind | 部分完成 | visible 与 development 已有读数；R10e development、final blind 缺失 |
+| 7. 人工审核微调数据 | 未完成 | 588 draft、0 reviewed；队列与指南已就绪 |
+| 8. LoRA/QLoRA adapter | 未完成 | 明令禁止在无人值守阶段启动训练 |
+| 9. 强模型对照与 offload 说明 | 已完成（接口诊断） | R11/R11b；不是干净能力上界 |
+| 10. 消融报告与最终 dashboard | 部分完成 | 完整消融总表、`docs/phase2_report_draft.md` 已有；最终 dashboard 待 R12/blind |
+| 11. 来源、泛化、安全结论 | 阶段性完成 | 报告明确 visible 增益、heldout 缺口与安全三层边界；最终结论待 blind |
+
+无人值守可做的阶段 0–4 已完成。剩余工作严格限定为：人工审核数据；审核冻结后授权 R12 QLoRA；模型与方案冻结后授权 final blind。当前不满足 Phase 2 最终结项条件，也不满足“17 个完整测试全部通过”。
