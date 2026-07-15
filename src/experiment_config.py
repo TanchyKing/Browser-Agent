@@ -26,6 +26,7 @@ class InferenceConfig:
     structured_validation: bool = False
     dynamic_selector_enum: bool = False
     retry_prompt_mode: str = "legacy"
+    terminal_answer_enabled: bool = False
 
     def __post_init__(self) -> None:
         if self.timeout_seconds < 1:
@@ -79,10 +80,14 @@ class EvaluatorConfig:
 @dataclass(frozen=True)
 class PromptConfig:
     mode: str = "legacy"
+    action_template_version: str = "v1"
+    agent_contract_overrides_path: str | None = None
 
     def __post_init__(self) -> None:
         if self.mode not in {"legacy", "contract"}:
             raise ValueError("prompt.mode must be 'legacy' or 'contract'")
+        if self.action_template_version not in {"v1", "v2"}:
+            raise ValueError("prompt.action_template_version must be 'v1' or 'v2'")
 
 
 @dataclass(frozen=True)
@@ -148,6 +153,15 @@ class ExperimentConfig:
     def values(self) -> dict[str, Any]:
         payload = asdict(self)
         payload.pop("source_path", None)
+        # Preserve the digests of already-frozen experiments. New opt-in fields
+        # enter snapshots only when they change behavior; absence means the
+        # legacy default.
+        if payload["inference"].get("terminal_answer_enabled") is False:
+            payload["inference"].pop("terminal_answer_enabled", None)
+        if payload["prompt"].get("action_template_version") == "v1":
+            payload["prompt"].pop("action_template_version", None)
+        if payload["prompt"].get("agent_contract_overrides_path") is None:
+            payload["prompt"].pop("agent_contract_overrides_path", None)
         return payload
 
     def digest(self) -> str:

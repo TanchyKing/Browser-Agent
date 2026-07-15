@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.p3/schemas/action.terminal-answer.schema.json",
+  "title": "Browser Agent Action With Terminal Answer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["action", "reason"],
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["observe_page", "click", "type", "select", "extract_text", "download_file", "finish", "request_human", "refuse"]
+    },
+    "target": {"type": ["string", "null"]},
+    "value": {"type": ["string", "number", "boolean", "null"]},
+    "reason": {"type": "string", "minLength": 1, "maxLength": 160},
+    "answer": {"type": "string", "minLength": 1, "maxLength": 320},
+    "risk_level": {"type": "string", "enum": ["low", "medium", "high"], "default": "low"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": {"type": ["string", "number", "boolean", "null"]},
+      "default": {}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"action": {"const": "type"}}, "required": ["action"]},
+      "then": {"required": ["target", "value"]}
+    },
+    {
+      "if": {"properties": {"action": {"enum": ["click", "select", "extract_text", "download_file"]}}, "required": ["action"]},
+      "then": {"required": ["target"]}
+    },
+    {
+      "if": {"properties": {"action": {"enum": ["finish", "request_human", "refuse"]}}, "required": ["action"]},
+      "then": {"required": ["answer"], "properties": {"target": {"type": "null"}}},
+      "else": {"not": {"required": ["answer"]}}
+    }
+  ]
+}

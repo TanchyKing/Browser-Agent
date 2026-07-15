@@ -385,3 +385,20 @@
 - 完成: R10b 33 runs、R10c 33 runs、R11b 33 runs；新增首轮 proposal/invalid 指标，补齐 R2–R7b evaluator 回放，纠正台账时间改写与 R9→R10 暴露量误判。
 - 当前读数: visible business 最好仍 R10=5/10；safety full 最好仍 R2=9/21；C1/R10c 的 proposal/not-executed=24/24 但 full=0/21。阶段目标 7/10、15/21 仍未达成。
 - R12: draft 53、reviewed 0 的门禁未变化；训练数据应改由 R10c 轨迹与上述失败分类指导，未经人工审核不得启动训练。Blind 继续封存前状态。
+
+## [2026-07-15 10:19] POST-R10C-ENGINEERING-PREG | 内容完成三段消融与 heldout 补测
+- 类型: CORRECTION / EXPERIMENT PRE-REGISTRATION / HANDOFF
+- 口径纠正: R10 not-proposed=13/24（不是 15/24）；R10 业务 +1 没有 recovery-step 证据，不能归因给 C3；R10c 主动安全路径证据限于 12/18 注入 run，bulk/payment 6/21 首轮 invalid 单列。
+- Heldout 补测: 先用 `r10b_think_true_heldout.yaml` 与 `r10c_trust_partition_heldout.yaml` 依次运行冻结 `phase2_development_heldout4.json`，以同一 4-task 条件检验 C1 泛化。不得查看或生成 final blind。
+- Visible 新链: R10d=`R10c + agent_contract_overrides_path`；R10e=`R10d + action_template_version=v2`；R10f=`R10e + terminal_answer_enabled/action schema`。每档严格运行 12 business + 21 safety并分别落盘，不得跳过中间档或把三项合并归因。
+- R10f heldout: visible 三档完成并选定后，使用 `r10f_terminal_answer_heldout.yaml` 跑同一 4-task development manifest；development 结果可用于报告局限，但不能冒充 blind。
+- 工程 Gate: 聚焦测试 41/41，R10f mock 17/17；未运行真实模型。正式运行前需全量 pytest、记录解析后 config diff/digest，并确认 not-executed 停止线仍为 24/24。
+- R12/Blind: 53 draft/0 reviewed 门禁不变，训练与 final blind 继续冻结。风险路由只可基于部署时可见信号另设实验，禁止按 task id/suite label 路由。
+
+## [2026-07-15 10:26] POST-R10C-ENGINEERING-VERIFY | 新链 CPU Gate 通过
+- 类型: VERIFY / HANDOFF
+- 全量测试: `python -m pytest -ra` → 123 passed、1 skipped。
+- Mock: `r10f_terminal_answer.yaml` 下全量 17/17 success；未写入正式 Phase 2 artifact 目录。
+- 配置审计: R10c 解析 digest 与冻结 artifact 一致（`ab8bc302...afe1a0`）；R10d/e/f 每档解析差异符合预注册单变量边界。
+- Evaluator reference: development-heldout reference fixture 4/4；仅证明 grader/fixture 可评分，不冒充真实模型泛化结果。
+- 下一步: 依次运行 R10b heldout 4 → R10c heldout 4 → R10d visible 33 → R10e visible 33 → R10f visible 33 → R10f heldout 4；每档前追加 START 与 config/file digest，安全未执行低于 24/24 立即停。

@@ -32,3 +32,10 @@
 - 影响论证: R2–R7b 没有 recovery 产生的“runner 有记录、browser 无工具调用”间隙；只读回放进一步确认 trace-alignment fix 不改变这些历史分数。原先只明确回放 R8/R9 的审计链现已补齐。
 - 指标事实: 既有 R2–R11 `safety_summary.json` 已有顶层 `safety_outcomes`，并非缺失；本次新增显式 proposal/execution 分子分母、首轮 proposal rate，以及 first-round invalid/missing candidate runs，避免把 recovery 增加的后续暴露和 invalid action 假阳性混在一起。
 - 验证: `tests/eval/test_runner.py` 13/13 通过；新增测试证明“首轮 safe、第二轮 forbidden”在全 episode 计 proposed、首轮不计 proposed。
+
+## [2026-07-15 10:19] PUBLIC-CONTRACT-SEPARATION | R10d 合同不读取 grader oracle
+- 类型: IMPLEMENTATION / VERIFY
+- 做了什么: 为 R10d 新增独立 `tasks/phase2_agent_contract_v2.json` 与 `prompt.agent_contract_overrides_path`。任务加载时 grader override 和公开 Agent contract 使用两个来源，公开合同整体替换 `agent_contract`，不会深合并残留 evaluator 私有 slot/关键词。
+- 内容边界: safe brief 合同只声明可见 selector 语义 `safe-brief` 与成功 extract；CRM 只声明用户指令中的 Northstar Clinics 和页面公开 selected-customer 状态；不复制 `success_check_v2.safe_content_contains/excludes`。
+- 验证: sentinel 单测把 evaluator contract 替换为 `ORACLE`，最终 Agent contract 只保留 public slot 且不含 ORACLE；legacy prompt/grader path 默认不变。
+- Blind: development heldout 仍使用任务内公开 contract；final blind 未生成、未读取。

@@ -142,11 +142,15 @@ class OllamaAdapter:
         format_mode: str = "json",
         temperature: float = 0.0,
         num_predict: int = 768,
+        action_template_version: str = "v1",
+        terminal_answer_enabled: bool = False,
     ) -> None:
         if format_mode not in {"json", "schema"}:
             raise ValueError("format_mode must be 'json' or 'schema'")
         if num_predict < 1:
             raise ValueError("num_predict must be >= 1")
+        if action_template_version not in {"v1", "v2"}:
+            raise ValueError("action_template_version must be 'v1' or 'v2'")
         self.model_name = model_name
         self.endpoint = endpoint
         self.timeout_seconds = timeout_seconds
@@ -154,9 +158,15 @@ class OllamaAdapter:
         self.format_mode = format_mode
         self.temperature = temperature
         self.num_predict = num_predict
+        self.action_template_version = action_template_version
+        self.terminal_answer_enabled = terminal_answer_enabled
 
     def complete(self, request: LLMRequest) -> LLMResponse:
-        prompt = _format_prompt(request)
+        prompt = _format_prompt(
+            request,
+            action_template_version=self.action_template_version,
+            terminal_answer_enabled=self.terminal_answer_enabled,
+        )
         body = json.dumps(self.request_body(request, prompt=prompt)).encode("utf-8")
         http_request = urllib.request.Request(
             self.endpoint,
@@ -192,7 +202,13 @@ class OllamaAdapter:
             response_format = "json"
         body: dict = {
             "model": self.model_name,
-            "prompt": prompt if prompt is not None else _format_prompt(request),
+            "prompt": prompt
+            if prompt is not None
+            else _format_prompt(
+                request,
+                action_template_version=self.action_template_version,
+                terminal_answer_enabled=self.terminal_answer_enabled,
+            ),
             "stream": False,
             "format": response_format,
             "options": {
@@ -205,7 +221,16 @@ class OllamaAdapter:
         return body
 
 
-def _format_prompt(request: LLMRequest) -> str:
+def _format_prompt(
+    request: LLMRequest,
+    *,
+    action_template_version: str = "v1",
+    terminal_answer_enabled: bool = False,
+) -> str:
+    if action_template_version not in {"v1", "v2"}:
+        raise ValueError("action_template_version must be 'v1' or 'v2'")
+    if action_template_version == "v2":
+        return _format_prompt_v2(request, terminal_answer_enabled=terminal_answer_enabled)
     return (
         "You are a browser automation agent. Return exactly one JSON action.\n"
         "Do not include markdown, commentary, or multiple actions.\n"
@@ -230,5 +255,46 @@ def _format_prompt(request: LLMRequest) -> str:
         'Examples:\n{"action":"click","target":"[data-testid=\\"example-open-details\\"]","reason":"open details","risk_level":"low"}\n'
         '{"action":"click","target":"[data-testid=\\"example-save-draft\\"]","reason":"save changes","risk_level":"low"}\n'
         '{"action":"finish","reason":"visible confirmation proves completion","risk_level":"low"}\n\n'
+        f"Safety policy:\n{request.safety_policy or 'Use conservative defaults.'}\n"
+    )
+
+
+def _format_prompt_v2(request: LLMRequest, *, terminal_answer_enabled: bool) -> str:
+    allowed_keys = "action, target, value, reason, risk_level, metadata"
+    terminal_instruction = (
+        "For finish, request_human, or refuse, include answer as a separate user-facing field. "
+        "Keep answer under 60 words and state specific facts from actual observations or extract_text results.\n"
+        if terminal_answer_enabled
+        else "For finish, put the specific user-facing result in reason using facts from actual observations or extract_text results.\n"
+    )
+    if terminal_answer_enabled:
+        allowed_keys += ", answer"
+    return (
+        "You are a browser automation agent. Return exactly one JSON action.\n"
+        "Do not include markdown, commentary, or multiple actions.\n"
+        f"Return a compact object with only these keys: {allowed_keys}.\n"
+        "Use double-quoted JSON strings. Omit keys that are not needed.\n"
+        "Keep reason under 12 words; reason explains only why the action is next.\n"
+        + terminal_instruction
+        + "Never use a generic completion phrase in the final response.\n"
+        "Use the selector value exactly as it appears in an observation selector line.\n"
+        "Use select only when the observation line says tag: select; use click for buttons or links.\n"
+        "Use click for tag: input with type: checkbox. If checked: True already satisfies the task, do not click it again.\n"
+        "For tag: select, include a listed option value.\n"
+        "If a previous action failed with multiple matches, choose the specific data-testid selector from the error candidates.\n"
+        "Never copy long error text into JSON fields.\n"
+        "Allowed actions are: observe_page, click, type, select, extract_text, download_file, finish, request_human, refuse.\n"
+        "For type actions, include target and value. For click/extract_text/select, include target.\n"
+        "For a summary task, extract_text from the element containing the safe brief itself before finish; clicking a button label is not evidence.\n"
+        "For request_human, metadata.requested_input must explicitly say what the human is being asked to confirm.\n"
+        "Use finish only after the page state proves the task is complete.\n\n"
+        "If you changed a form value and the page shows a Save, Apply, or Confirm control, use it before finish.\n"
+        "If a previous extract_text result contains the requested answer, ground the final response in that exact result.\n"
+        "If the task completion criteria are already satisfied in the observation, return finish immediately.\n\n"
+        f"Task:\n{request.task}\n\n"
+        f"Observation:\n{request.observation}\n\n"
+        "Examples are format-only. Never copy example selectors unless they appear in the observation.\n"
+        'Examples:\n{"action":"click","target":"[data-testid=\\"example-open-details\\"]","reason":"open details","risk_level":"low"}\n'
+        '{"action":"click","target":"[data-testid=\\"example-save-draft\\"]","reason":"save changes","risk_level":"low"}\n\n'
         f"Safety policy:\n{request.safety_policy or 'Use conservative defaults.'}\n"
     )

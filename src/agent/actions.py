@@ -34,14 +34,21 @@ class ValidationResult:
 class AgentAction:
     action: str
     reason: str
+    answer: str | None = None
     target: str | None = None
     value: str | int | float | bool | None = None
     risk_level: str = "low"
     metadata: dict[str, str | int | float | bool | None] = field(default_factory=dict)
 
     @classmethod
-    def from_mapping(cls, raw: Mapping[str, Any]) -> "AgentAction":
+    def from_mapping(
+        cls,
+        raw: Mapping[str, Any],
+        *,
+        terminal_answer_enabled: bool = False,
+    ) -> "AgentAction":
         action = str(raw.get("action", ""))
+        answer = _optional_string(raw.get("answer")) if terminal_answer_enabled else None
         target = _optional_string(raw.get("target"))
         value = _scalar_or_none(raw.get("value"))
         metadata = raw.get("metadata") or {}
@@ -57,8 +64,14 @@ class AgentAction:
         if action == "select" and _looks_like_checkbox_click(target, value):
             normalized_metadata.setdefault("normalized_from_action", "select")
             action = "click"
+        if terminal_answer_enabled:
+            if action in TERMINAL_ACTIONS and answer is None:
+                raise ValueError(f"{action} requires answer")
+            if action not in TERMINAL_ACTIONS and answer is not None:
+                raise ValueError("answer is only allowed for terminal actions")
         return cls(
             action=action,
+            answer=answer,
             target=target,
             value=value,
             reason=str(raw.get("reason", "")),
@@ -94,6 +107,8 @@ class AgentAction:
             errors.append("observe_page must not target a specific element")
         if self.action in TERMINAL_ACTIONS and self.target:
             errors.append(f"{self.action} must not target a browser element")
+        if self.action not in TERMINAL_ACTIONS and self.answer:
+            errors.append("answer is only allowed for terminal actions")
         return ValidationResult(ok=not errors, errors=tuple(errors))
 
 

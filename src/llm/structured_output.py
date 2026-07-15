@@ -53,8 +53,26 @@ class StructuredAction(BaseModel):
         return self
 
 
-def validate_structured_action(payload: Mapping[str, Any]) -> dict[str, Any]:
-    return StructuredAction.model_validate(dict(payload)).model_dump()
+class StructuredActionWithTerminalAnswer(StructuredAction):
+    answer: str | None = Field(default=None, min_length=1, max_length=320)
+
+    @model_validator(mode="after")
+    def validate_terminal_answer_contract(self) -> "StructuredActionWithTerminalAnswer":
+        is_terminal = self.action in {"finish", "request_human", "refuse"}
+        if is_terminal and not self.answer:
+            raise ValueError(f"{self.action} requires answer")
+        if not is_terminal and self.answer is not None:
+            raise ValueError("answer is only allowed for terminal actions")
+        return self
+
+
+def validate_structured_action(
+    payload: Mapping[str, Any],
+    *,
+    terminal_answer_enabled: bool = False,
+) -> dict[str, Any]:
+    model = StructuredActionWithTerminalAnswer if terminal_answer_enabled else StructuredAction
+    return model.model_validate(dict(payload)).model_dump()
 
 
 def observation_grounded_schema(

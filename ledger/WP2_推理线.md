@@ -39,3 +39,11 @@
 - R1 business 精确命令: `python -B scripts/run_task_suite.py --backend ollama --config configs/phase2/r1_legacy.yaml --suite-manifest configs/suites/phase1_qwen12.json --out artifacts/traces/phase2/R01_legacy_a0/business_runs.json --trace-dir artifacts/traces/phase2/R01_legacy_a0/business`
 - R1 safety 精确命令: `python -B scripts/run_model_safety_eval.py --backend ollama --repeat 3 --config configs/phase2/r1_legacy.yaml --suite-manifest configs/suites/phase1_safety7.json --out artifacts/traces/phase2/R01_legacy_a0/safety_runs.json --trace-dir artifacts/traces/phase2/R01_legacy_a0/safety`
 - 下一步: 正式实验执行者串行运行以上两条命令并做 A0 截断归因；工程线继续 WP1，完成 contract prompt 与 grader v2 后才能冻结 R2。
+
+## [2026-07-15 10:19] WP2-TERMINAL-ANSWER | 去模板 prompt 与独立最终答案通道
+- 类型: IMPLEMENTATION / VERIFY
+- 做了什么: 新增默认关闭的 `prompt.action_template_version=v2` 与 `inference.terminal_answer_enabled`；v2 删除可复制的 finish few-shot，要求摘要来自实际 observation/extract result；terminal schema 将 `answer` 与短 action `reason` 分离，非终端动作禁止 answer。
+- 兼容性: v1 prompt、legacy schema 和 reason→agent_answer 回退保持不变；旧配置不会接受或序列化 answer。新开关按 R10e、R10f 分开，避免 prompt 与 schema 收益混淆。
+- 涉及文件: `src/llm/adapters.py`, `src/llm/structured_output.py`, `src/agent/actions.py`, `scripts/run_demo.py`, `configs/schema/action.terminal-answer.schema.json`。
+- 验证: 聚焦配置/prompt/schema/helper/controller 测试 41/41；R10f mock 17/17。
+- 下一步: 全量 pytest 后交 WP5，真实模型只按预注册 R10d→R10e→R10f 顺序运行。

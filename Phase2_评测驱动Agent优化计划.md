@@ -1,6 +1,6 @@
 # P3 Phase 2：评测驱动的 Browser Agent 优化计划
 
-> 修订说明（2026-07-14）：根据对 artifacts、任务定义和源代码的独立复核，补充了原始响应/截断日志、`num_predict` 单变量消融，以及明确的强模型基线与延迟口径。同日第二次修订：将 R11 强模型上界并入里程碑 M4，并在 §11 开头新增依赖关系与可并行工作说明。第三次修订：区分开发 held-out 与最终封存测试，修正重复动作完成逻辑，并补充候选动作审计、固定 suite manifest 和可重建训练 trace 要求。第四次修订（2026-07-15）：根据 R9 实测，明确 R10 的 block recovery 同时覆盖 critic reject 与 policy block，避免 critic 的终端 replacement 提前截断恢复路径。第五次修订（2026-07-15）：根据 R2–R11 事后审计，补充 R10b thinking 解耦、R10c 信任分区和 R11b 同接口规模对照；原 R11 降级为接口兼容性诊断，不再称为能力上界。
+> 修订说明（2026-07-14）：根据对 artifacts、任务定义和源代码的独立复核，补充了原始响应/截断日志、`num_predict` 单变量消融，以及明确的强模型基线与延迟口径。同日第二次修订：将 R11 强模型上界并入里程碑 M4，并在 §11 开头新增依赖关系与可并行工作说明。第三次修订：区分开发 held-out 与最终封存测试，修正重复动作完成逻辑，并补充候选动作审计、固定 suite manifest 和可重建训练 trace 要求。第四次修订（2026-07-15）：根据 R9 实测，明确 R10 的 block recovery 同时覆盖 critic reject 与 policy block，避免 critic 的终端 replacement 提前截断恢复路径。第五次修订（2026-07-15）：根据 R2–R11 事后审计，补充 R10b thinking 解耦、R10c 信任分区和 R11b 同接口规模对照；原 R11 降级为接口兼容性诊断，不再称为能力上界。第六次修订（2026-07-15）：根据 R10c 逐任务复盘，预注册公开证据合同、去模板 prompt、独立 terminal answer 三段工程消融，并补齐 R10b/R10c development held-out 对照；R12 数据门禁和 final blind 继续冻结。
 
 ## 1. Phase 2 定位
 
@@ -262,6 +262,16 @@ R9 实测表明，只恢复 policy block 不够：pre-action critic 会先把高
 
 critic reject 的恢复 trace 必须明确 `policy_decision=not evaluated`、`executed_action=null`，不能把未进入 policy/工具层的候选记成已执行。程序侧 policy 仍拥有最终否决权。
 
+### C4. 内容完成链与终端答案合同
+
+R10c 的 proposal 安全改善没有转成 full success，失败已集中到可确定修复的接口问题：模型常点击按钮标签而没有 `extract_text` 真正的 safe brief，随后又逐字复制 prompt 中的通用 finish 示例。修复必须拆为三个显式开关，旧配置默认保持不变：
+
+1. **R10d 公开证据合同**：安全摘要任务在 AgentState 中要求 `extract_text` 命中页面可见的 `safe-brief` 元素后才允许 finish；CRM selection slot 改为点击后验证公开 DOM 的 selected-customer，不再强迫额外 extract。合同不得包含 evaluator 私有 `safe_content_contains` 关键词。
+2. **R10e prompt v2**：删除可复制的 finish few-shot；明确 reason 只解释下一动作，最终内容必须来自实际 observation/extract result；`request_human.metadata.requested_input` 必须说清要用户确认什么。
+3. **R10f 独立 terminal answer**：schema 为 `finish/request_human/refuse` 增加必填、最长 320 字符的 `answer`；非终端动作禁止该字段。evaluator 的 `agent_answer` 优先读取 answer，legacy 配置仍回退 reason。320 字符上限与 60 词提示用于降低 `num_predict=128` 下的截断风险。
+
+三项不能合成一次运行，否则无法判断收益来自 verifier、prompt 还是输出合同。R10c 的 24/24 not-proposed 中有 bulk/payment 6/21 首轮 invalid，因此只能把其余 12/18 注入 run 称为主动安全路径正确；不能写成“全部安全路径正确”。R10 的业务 4→5 同样不能归因于 recovery，因为其 5 个成功 run 都没有 recovery step。
+
 ## 7. 工作流 D：模型横向基线
 
 微调前增加模型横向对照，用于区分模型规模、推理模式和 Agent 接口兼容性。只有模型已适配同一 action contract、且对照变量清楚时，才能讨论能力上界；不能把接口字段错位直接解释为模型容量不足或容量无效。
@@ -389,11 +399,14 @@ R11b 已按上述协议完成：14B 相对 R10c 只改变模型，business 0/10�
 | R10 | R9 + block recovery | 判断能否安全完成被注入任务 |
 | R10b | R10 + `think:true` | 解耦 R3 安全塌方，重新判断 critic/recovery 在 thinking 开启时的收益 |
 | R10c | R10b + trust partition | 给 C1 正式消融槽位，判断输入信任标注是否降低危险首轮提议 |
+| R10d | R10c +公开 completion-contract 修复 | 判断 safe-brief 证据链与 CRM DOM 完成判据的独立收益 |
+| R10e | R10d + prompt v2（删除 finish 模板） | 判断去模板化与具体事实指令的独立收益 |
+| R10f | R10e +独立 terminal `answer` schema | 判断 action reason 与用户最终答案解耦的独立收益 |
 | R11 | R10 + `qwen3:14b`（已完成的历史诊断） | 只记录 14B 在 8B/`think:false` 定制接口下的兼容性，不作能力上界结论 |
 | R11b | R10c + `qwen3:14b` | 与 R10c 形成只改变模型的同接口规模对照 |
-| R12 | R10b/R10c 中预先选定并冻结的 controller + LoRA/QLoRA | 判断微调是否带来额外收益 |
+| R12 | R10c–R10f 中根据 visible/development 结果预先选定并冻结的 controller/interface + LoRA/QLoRA | 判断微调是否带来额外收益 |
 
-R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使用同一套修正后 grader、任务、repeat 规则，并一次只增加一个主要变量。R5 是同一个 `num_predict` 变量的三档取值。R0/R1 与 R2 之后的结果必须分栏展示，不能直接把不同 grader 下的绝对分数相减。R4–R10 的 safety full success 继承 R3 `think:false` 地板，只能描述该配置链，不能据此否定 critic/recovery 在 thinking 开启时的效果；R10b 是必须先于 R12 完成的解耦实验。
+R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使用同一套修正后 grader、任务、repeat 规则，并一次只增加一个主要变量。R5 是同一个 `num_predict` 变量的三档取值。R0/R1 与 R2 之后的结果必须分栏展示，不能直接把不同 grader 下的绝对分数相减。R4–R10 的 safety full success 继承 R3 `think:false` 地板，只能描述该配置链，不能据此否定 critic/recovery 在 thinking 开启时的效果；R10b 已完成解耦，R10d/e/f 则在 R10c 上依次修复内容完成接口。R10 的 not-proposed 正确基线是 13/24，15/24 属于 R9。
 
 ## 10. Phase 2 指标与验收目标
 
@@ -432,7 +445,7 @@ R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使
 
 ### 依赖关系与可并行工作
 
-主消融链 R1→R10 已按矩阵执行；事后审计新增的 R10b→R10c 必须在 R12 数据定稿前串行完成。R11 是已完成但有接口混淆的历史诊断；R11b 只从 R10c 切换模型，形成规模对照。R12 使用哪一个 controller 必须在 visible 结果后一次性选定并冻结，不能根据 blind 结果返工。本机只有一块 8GB GPU，因此评测推理、`qwen3:14b` offload 和 QLoRA 训练仍需串行调度。工程实现只有在独立 git worktree 中才允许并行；共享同一目录/HEAD 的会话必须串行。
+主消融链 R1→R10、审计补链 R10b→R10c→R11b 已执行；下一条工程消融为 R10d→R10e→R10f。先用 R10b/R10c 各 4 条 development held-out 补 C1 泛化对照，再运行三档 visible 33-run，最后对 R10f 跑 4 条 development held-out。R11 是已完成但有接口混淆的历史诊断。R12 使用哪一个 controller/interface 必须在 visible/development 结果后一次性选定并冻结，不能根据 blind 结果返工。本机只有一块 8GB GPU，因此评测推理、`qwen3:14b` offload 和 QLoRA 训练仍需串行调度。工程实现只有在独立 git worktree 中才允许并行；共享同一目录/HEAD 的会话必须串行。
 
 可并行的四条工作线：
 
@@ -480,6 +493,7 @@ R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使
 - 加强 safety answer/content check；
 - 重跑 expanded safety。
 - 审计补实验：先运行 R10b（仅 `think:true`），再运行 R10c（仅 `trust_partition_enabled=true`）；同时报告全 episode 与首轮 forbidden proposal，避免 recovery 暴露量混淆。
+- 内容修复补实验：先补 R10b/R10c development held-out，再依次运行 R10d（公开证据合同）、R10e（去模板 prompt）、R10f（独立 terminal answer）；风险路由只能在该链结果之后另行预注册，禁止用 suite/task id 作 oracle。
 
 ### M4：模型横向对照与微调实验
 

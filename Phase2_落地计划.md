@@ -2,7 +2,7 @@
 
 > 本文是 `Phase2_评测驱动Agent优化计划.md`（下称"总计划"）的执行版，供多个 Codex 会话并行认领工作。
 > 逐 run 证据见 `完整测试逐步复盘.md`（下称"复盘"）。本文不重复其内容，只规定"谁做什么、按什么顺序、如何验证、何时停"。
-> 复核修订（2026-07-14）：补充单 worktree 执行限制、固定 12-run manifest、统一配置入口、训练 trace、critic 候选审计和最终 blind holdout；修正重复动作完成逻辑与 WP 间硬依赖。R9 后修订（2026-07-15）：R10 的 recovery 统一覆盖 critic reject 与 policy block，关闭开关时保持 R9 行为可复现。R11 后审计修订（2026-07-15）：新增 R10b thinking 解耦、R10c C1 正式槽位和 R11b 同接口规模对照；原 R11 不再称能力上界。
+> 复核修订（2026-07-14）：补充单 worktree 执行限制、固定 12-run manifest、统一配置入口、训练 trace、critic 候选审计和最终 blind holdout；修正重复动作完成逻辑与 WP 间硬依赖。R9 后修订（2026-07-15）：R10 的 recovery 统一覆盖 critic reject 与 policy block，关闭开关时保持 R9 行为可复现。R11 后审计修订（2026-07-15）：新增 R10b thinking 解耦、R10c C1 正式槽位和 R11b 同接口规模对照；原 R11 不再称能力上界。R10c 内容失败复盘修订（2026-07-15）：在下一次 GPU Gate 前增加 R10d 合同修复、R10e 去模板 prompt、R10f 独立 terminal answer 三个单变量槽位，并补 R10b/R10c development held-out 对照。
 
 ---
 
@@ -189,9 +189,10 @@ R1 legacy replay 要求"除 A0 日志外一切与 Phase 1 相同"。因此：
 | G4 | **R6** +selector enum → **R7** +AgentState → **R8** +completion verifier | 每步只开一个新 flag |
 | G5 | **R9** +pre-action critic → **R10** +block recovery | 安全指标三层全报（not_proposed / not_executed / full_success）；not_executed 必须保持 1.0 |
 | G5b | **R10b** R10 + `think:true` → **R10c** +trust partition | 两档各跑 visible 12+21；补报首轮 proposal 与 invalid-first-action，先解耦 R3 地板，再测 C1 |
+| G5c | **R10d** R10c +公开 completion-contract 修复 → **R10e** +去模板 prompt v2 → **R10f** +独立 terminal `answer` | 三档各跑 visible 12+21，一次只改一层；先补 R10b/R10c 各 4 条 development held-out，再运行新链；R10f 追加 4 条 development held-out |
 | G6 | **R11b** R10c + `qwen3:14b`；另行完成训练后执行 **R12** 微调模型评测 | R11b 与 R10c 只差 model；原 R11 仅作接口诊断。R12 使用 visible 结果后预先冻结的 controller |
 
-R3–R10c 适用“一次只增加一个能力变量”；R2 是新的测量/提示协议基线。R10b/R10c/R11b 只运行冻结 visible business/safety 的 33 runs，不再根据 development held-out 调参。最终 blind holdout 尚未生成；待 R10b/R10c 选定 controller、训练数据和超参数全部冻结后，才在冻结 base 与 R12 比较点运行，结果出来后不得再调 controller、grader、超参数或训练集。
+R3–R10f 适用“一次只增加一个能力变量”；R2 是新的测量/提示协议基线。R10b/R10c/R11b 的首轮补实验只运行了冻结 visible business/safety 的 33 runs。为补齐审计缺口，下一 Gate 先以相同 4-task manifest 运行 R10b/R10c development held-out，仅用于检验 C1 对未见注入措辞的迁移；随后 R10d/e/f 仍以 visible 33-run 做主消融，R10f 再做 development held-out。公开合同只含用户任务和页面可观察证据，不得含 evaluator 私有关键词。最终 blind holdout 尚未生成；待新链选定 controller、训练数据和超参数全部冻结后，才在冻结 base 与 R12 比较点运行，结果出来后不得再调 controller、grader、超参数或训练集。
 
 ## 7. 台账条目模板
 
@@ -216,7 +217,7 @@ RUN 条目（WP5）额外要求：完整开关快照、run artifact 路径、指
 
 > **WP5 专用**：
 >
-> 你负责 WP5 实验执行。确认 §6 前置完成后，严格执行 R1→R10 主链及审计补链 R10b→R10c→R11b；R12 继续受人工数据 gate 约束，GPU 上串行调度。所有命令必须显式传 `--config` 和 `--suite-manifest`；每个 run 前登记快照，跑后汇总并写正式记录；`forbidden_action_not_executed_rate` 低于 1.0 立即停止。
+> 你负责 WP5 实验执行。确认 §6 前置完成后，严格执行 R1→R10 主链、已完成的审计补链 R10b→R10c→R11b，以及新预注册的 R10b/R10c held-out→R10d→R10e→R10f；R12 继续受人工数据 gate 约束，GPU 上串行调度。所有命令必须显式传 `--config` 和 `--suite-manifest`；每个 run 前登记快照，跑后汇总并写正式记录；`forbidden_action_not_executed_rate` 低于 1.0 立即停止。
 
 ---
 

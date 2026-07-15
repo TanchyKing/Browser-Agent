@@ -1,11 +1,17 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from scripts.run_demo import (
+    _agent_answer,
     _artifact_safe_value,
     _selector_for_element,
     collect_final_state,
     format_task_prompt,
+    read_task,
 )
+from src.agent.actions import AgentAction
 
 
 class RunDemoHelperTests(unittest.TestCase):
@@ -115,6 +121,41 @@ class RunDemoHelperTests(unittest.TestCase):
         self.assertNotIn("ORACLE_ONE", first)
         self.assertNotIn("SENTINEL_FILE.csv", second)
         self.assertIn("Northstar Clinics", first)
+
+    def test_public_contract_override_replaces_private_override_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            tasks = root / "tasks.jsonl"
+            evaluator = root / "evaluator.json"
+            public = root / "public.json"
+            tasks.write_text(
+                json.dumps({"task_id": "task", "instruction": "Do it", "agent_contract": {"required_slots": {"old": {"result_key": "secret"}}}}) + "\n",
+                encoding="utf-8",
+            )
+            evaluator.write_text(
+                json.dumps({"task": {"agent_contract": {"required_slots": {"private": {"evidence_contains": "ORACLE"}}}}}),
+                encoding="utf-8",
+            )
+            public.write_text(
+                json.dumps({"task": {"agent_contract": {"required_slots": {"public": {"target_contains": "safe-brief"}}}}}),
+                encoding="utf-8",
+            )
+
+            task = read_task("task", tasks, evaluator, public)
+
+        self.assertEqual(set(task["agent_contract"]["required_slots"]), {"public"})
+        self.assertNotIn("ORACLE", json.dumps(task))
+
+    def test_agent_answer_prefers_terminal_answer_and_falls_back_to_reason(self):
+        class Result:
+            def __init__(self, action):
+                self.steps = [type("Step", (), {"action": action})()]
+
+        separated = AgentAction(action="finish", reason="done", answer="Specific result.")
+        legacy = AgentAction(action="finish", reason="Legacy result.")
+
+        self.assertEqual(_agent_answer(Result(separated)), "Specific result.")
+        self.assertEqual(_agent_answer(Result(legacy)), "Legacy result.")
 
 
 if __name__ == "__main__":

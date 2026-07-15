@@ -82,6 +82,7 @@ class BrowserAgentRunner:
         critic_enabled: bool = False,
         block_recovery_enabled: bool = False,
         max_consecutive_blocks: int = 2,
+        terminal_answer_enabled: bool = False,
     ) -> None:
         if max_steps < 1:
             raise ValueError("max_steps must be >= 1")
@@ -114,6 +115,7 @@ class BrowserAgentRunner:
         self.critic_enabled = controller_enabled and critic_enabled
         self.block_recovery_enabled = controller_enabled and block_recovery_enabled
         self.max_consecutive_blocks = max_consecutive_blocks
+        self.terminal_answer_enabled = terminal_answer_enabled
 
     def run(self, task: str) -> AgentRunResult:
         steps: list[AgentStep] = []
@@ -457,8 +459,14 @@ class BrowserAgentRunner:
             try:
                 action_payload = llm_response.as_json()
                 if self.structured_validation:
-                    action_payload = validate_structured_action(action_payload)
-                action = AgentAction.from_mapping(action_payload)
+                    action_payload = validate_structured_action(
+                        action_payload,
+                        terminal_answer_enabled=self.terminal_answer_enabled,
+                    )
+                action = AgentAction.from_mapping(
+                    action_payload,
+                    terminal_answer_enabled=self.terminal_answer_enabled,
+                )
             except Exception as exc:
                 last_error = str(exc)
                 attempt_audits.append(

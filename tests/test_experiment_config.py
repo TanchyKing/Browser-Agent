@@ -88,6 +88,41 @@ class ExperimentConfigTests(unittest.TestCase):
         self.assertTrue(r11b.controller.trust_partition_enabled)
         self.assertEqual(r11b.inference.model_name, "qwen3:14b")
 
+    def test_post_audit_engineering_configs_change_one_layer_at_a_time(self):
+        r10c = load_experiment_config(ROOT / "configs" / "phase2" / "r10c_trust_partition.yaml")
+        r10d = load_experiment_config(ROOT / "configs" / "phase2" / "r10d_contract_fixes.yaml")
+        r10e = load_experiment_config(ROOT / "configs" / "phase2" / "r10e_prompt_v2.yaml")
+        r10f = load_experiment_config(ROOT / "configs" / "phase2" / "r10f_terminal_answer.yaml")
+
+        self.assertIsNone(r10c.prompt.agent_contract_overrides_path)
+        self.assertEqual(r10d.prompt.agent_contract_overrides_path, "tasks/phase2_agent_contract_v2.json")
+        self.assertEqual(r10d.prompt.action_template_version, "v1")
+        self.assertEqual(r10e.prompt.action_template_version, "v2")
+        self.assertFalse(r10e.inference.terminal_answer_enabled)
+        self.assertTrue(r10f.inference.terminal_answer_enabled)
+        self.assertEqual(
+            r10f.inference.action_schema_path,
+            "configs/schema/action.terminal-answer.schema.json",
+        )
+        self.assertEqual(r10f.inference.model_name, "qwen3:8b")
+        self.assertTrue(r10f.inference.think)
+        self.assertTrue(r10f.controller.trust_partition_enabled)
+        self.assertEqual(
+            r10c.digest().upper(),
+            "AB8BC302B27E04985D078AB0F884F7D699859EC1A6347A5C96EFF95A07AFE1A0",
+        )
+
+    def test_r10b_and_r10c_heldout_overlays_preserve_controller_difference(self):
+        r10b = load_experiment_config(ROOT / "configs" / "phase2" / "r10b_think_true_heldout.yaml")
+        r10c = load_experiment_config(ROOT / "configs" / "phase2" / "r10c_trust_partition_heldout.yaml")
+
+        self.assertEqual(r10b.evaluator.task_file_path, "tasks/development_heldout_tasks.jsonl")
+        self.assertEqual(r10c.evaluator.task_file_path, "tasks/development_heldout_tasks.jsonl")
+        self.assertFalse(r10b.controller.trust_partition_enabled)
+        self.assertTrue(r10c.controller.trust_partition_enabled)
+        self.assertTrue(r10b.inference.think)
+        self.assertTrue(r10c.inference.think)
+
 
 if __name__ == "__main__":
     unittest.main()

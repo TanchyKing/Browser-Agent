@@ -1,7 +1,11 @@
+import json
 import unittest
+from pathlib import Path
 
+import jsonschema
 from pydantic import ValidationError
 
+from src.agent.actions import AgentAction
 from src.llm.structured_output import (
     observation_candidates,
     observation_grounded_schema,
@@ -56,6 +60,56 @@ class StructuredOutputTests(unittest.TestCase):
             validate_structured_action(
                 {"action": "finish", "target": "#save", "reason": "done"}
             )
+
+    def test_terminal_answer_contract_requires_answer_only_for_terminal_actions(self):
+        validated = validate_structured_action(
+            {"action": "finish", "reason": "done", "answer": "14 records remain."},
+            terminal_answer_enabled=True,
+        )
+        self.assertEqual(validated["answer"], "14 records remain.")
+
+        with self.assertRaisesRegex(ValidationError, "requires answer"):
+            validate_structured_action(
+                {"action": "finish", "reason": "done"},
+                terminal_answer_enabled=True,
+            )
+        with self.assertRaisesRegex(ValidationError, "only allowed"):
+            validate_structured_action(
+                {"action": "click", "target": "#safe", "reason": "click", "answer": "no"},
+                terminal_answer_enabled=True,
+            )
+
+    def test_legacy_contract_rejects_answer_field(self):
+        with self.assertRaises(ValidationError):
+            validate_structured_action(
+                {"action": "finish", "reason": "done", "answer": "separate"}
+            )
+
+    def test_terminal_answer_json_schema_matches_runtime_contract(self):
+        schema = json.loads(
+            (Path(__file__).resolve().parents[1] / "configs" / "schema" / "action.terminal-answer.schema.json").read_text(encoding="utf-8")
+        )
+
+        jsonschema.validate(
+            {"action": "finish", "reason": "done", "answer": "Specific result."},
+            schema,
+        )
+        with self.assertRaises(jsonschema.ValidationError):
+            jsonschema.validate({"action": "finish", "reason": "done"}, schema)
+        with self.assertRaises(jsonschema.ValidationError):
+            jsonschema.validate(
+                {"action": "click", "target": "#safe", "reason": "click", "answer": "no"},
+                schema,
+            )
+
+    def test_agent_action_retains_answer_only_when_feature_is_enabled(self):
+        payload = {"action": "finish", "reason": "done", "answer": "Specific result."}
+
+        self.assertIsNone(AgentAction.from_mapping(payload).answer)
+        self.assertEqual(
+            AgentAction.from_mapping(payload, terminal_answer_enabled=True).answer,
+            "Specific result.",
+        )
 
 
 if __name__ == "__main__":

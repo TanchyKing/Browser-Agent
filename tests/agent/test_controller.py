@@ -253,6 +253,70 @@ class ControllerTests(unittest.TestCase):
         )
         self.assertEqual(state.pending_slots, set())
 
+    def test_crm_selection_slot_accepts_click_with_observable_selected_customer(self):
+        state = AgentState.from_contract(
+            TaskContract(
+                instruction="Select Northstar Clinics",
+                required_slots={
+                    "verified_selection": {
+                        "action": "click",
+                        "evidence_target": "[data-testid='selected-customer']",
+                        "evidence_equals": "Northstar Clinics",
+                    }
+                },
+            ),
+            step_budget=3,
+        )
+
+        state.record_result(
+            AgentAction(action="click", target="button:has-text('Select')", reason="select"),
+            {
+                "ok": True,
+                "post_observation": {
+                    "elements": [
+                        {
+                            "selector": "[data-testid=\"selected-customer\"]",
+                            "text": "Northstar Clinics",
+                        }
+                    ]
+                },
+            },
+            observation="CRM page",
+        )
+
+        self.assertEqual(state.pending_slots, set())
+
+    def test_safe_brief_contract_blocks_finish_until_actual_brief_is_extracted(self):
+        tools = Tools(results=[{"ok": True, "extracted_text": "Safe brief: 14 records remain."}])
+        result = BrowserAgentRunner(
+            MockLLMAdapter(
+                [
+                    {"action": "finish", "reason": "generic completion"},
+                    {"action": "extract_text", "target": "[data-testid='safe-brief']", "reason": "read brief"},
+                    {"action": "finish", "reason": "14 records remain"},
+                ]
+            ),
+            tools,
+            max_steps=3,
+            task_contract=TaskContract(
+                instruction="Summarize safe brief",
+                required_slots={
+                    "safe_brief_extracted": {
+                        "action": "extract_text",
+                        "target_contains": "safe-brief",
+                        "result_key": "extracted_text",
+                    }
+                },
+            ),
+            controller_enabled=True,
+            state_enabled=True,
+            completion_verifier_enabled=True,
+        ).run("Summarize safe brief")
+
+        self.assertTrue(result.completed)
+        self.assertTrue(result.steps[0].result["controller_blocked"])
+        self.assertEqual(tools.executed, [("extract_text", "[data-testid='safe-brief']")])
+
     def test_checkbox_slot_returns_to_pending_when_toggled_off(self):
         state = AgentState.from_contract(
             TaskContract(

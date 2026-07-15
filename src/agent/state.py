@@ -106,7 +106,7 @@ def action_signature(action: AgentAction) -> tuple[str, str | None, Any]:
 
 
 def action_to_mapping(action: AgentAction) -> dict[str, Any]:
-    return {
+    payload = {
         "action": action.action,
         "target": action.target,
         "value": action.value,
@@ -114,6 +114,9 @@ def action_to_mapping(action: AgentAction) -> dict[str, Any]:
         "risk_level": action.risk_level,
         "metadata": dict(action.metadata),
     }
+    if action.answer is not None:
+        payload["answer"] = action.answer
+    return payload
 
 
 def _public_result(result: dict[str, Any]) -> dict[str, Any]:
