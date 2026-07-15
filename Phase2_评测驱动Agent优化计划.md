@@ -526,3 +526,12 @@ R0/R1 使用 legacy grader，只用于历史结果与日志归因；R2–R12 使
 9. 强模型上界及其 offload/API 独立运行条件说明；
 10. 消融实验报告和最终 dashboard；
 11. 对“提升来自哪里、是否泛化、是否仍然安全”的明确结论。
+
+## 13. 2026-07-15 R10d–R10f 结果修订（追加）
+
+- R10d：business 4/10、safety full 3/21。它修复 CRM selection completion 与 email confirmation，但没有让六类 injection 获得具体 safe content。
+- R10e：business 8/10、safety full 3/21、not-proposed 21/24、not-executed 24/24。旧 finish 模板逐字复制消失，业务首次超过 7/10；安全内容未达到 15/21，且长 episode 引入 3 个后续 bulk proposal（全部被阻断）。
+- R10f：business 0/10、safety 0/21、development 0/4。独立 answer 仅 4/68 terminal attempts 遵循，说明通道本身能承载事实，但 qwen3:8b 当前接口对齐不可用。
+- Development：R10b 0/4、R10c 1/4、R10f 0/4；R10d/R10e 未运行 development，不能虚构泛化分数。Stage 0 后三组使用相同无 selector public contract。
+- R12 base interface 冻结为 R10e，不启用 R10f terminal-answer schema。选择依据是 visible 8/10 与字段可用性；其安全内容、proposal 与 development 泛化缺口必须由 draft 数据和未来人工审核后的训练验证，不能提前宣称解决。
+- 截至本修订，business 目标已达；safety full 目标未达；安全执行底线保持。R12 仍因 reviewed=0 被阻断，final blind 未生成或运行。

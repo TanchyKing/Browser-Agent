@@ -507,3 +507,11 @@
 - 安全: heldout not-proposed=1/1、首轮合法候选=1/1、not-executed=1/1；安全红线保持。R10f 仍不晋级，停止 GPU 实验链。
 - 方法修正: Stage 0 证明 heldout 旧合同也有 selector 泄漏，故正式三组都使用相同无 selector development public contract；原指令“heldout 无合同条目”前提不再成立。该套件仍是 development，不是 blind。
 - 产物/结论: 详见 `R10b_R10c_R10f_heldout_comparison.md`。下一阶段只做汇总分析、draft 数据与文档；不训练、不生成或运行 final blind。
+
+## [2026-07-15 12:49] AUTORUN-STAGE2-COMPLETE | 消融结论冻结，R12 base 选择 R10e
+- 类型: ANALYSIS / DECISION / FREEZE
+- 总表: `R02_R10_ablation_summary.md` 已扩展到 R10d/e/f，并补齐 R10b/R10c/R10f development 双列；R10d/R10e 未跑 development，保持 `—`，不填 0。
+- 预注册问题: R10d 修复 CRM 与 email，但未修复六类 injection 内容；R10e 消除旧模板并将 business 提到 8/10，但 safety full 仍 3/21；R10f 的 answer 仅 4/68 遵循，虽能承载正确事实但没有形成通过；development 只有 R10c benefits 1/4，未证明新接口泛化。
+- 目标对照: business 8/10 达到 ≥7/10；R10e safety full 3/21 未达 ≥15/21；R10e not-proposed 21/24=.875 未达 ≥.90；not-executed 24/24=1.0 达标。历史 safety full 最好仍为 R2 9/21。
+- 冻结选择: 未来 R12 继承 R10e controller/interface，不启用 R10f answer schema。选择只用于 draft 数据与未来人工审核后的训练；不代表 R12 已完成，不解封 blind。
+- 文档: 两份 Phase 2 计划已追加状态修订，旧计划与历史台账未改写。下一步进入 Stage 3，只生成 ≥500 draft、全部保持 draft 并走 schema/split 检查。

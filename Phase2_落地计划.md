@@ -229,3 +229,12 @@ RUN 条目（WP5）额外要求：完整开关快照、run artifact 路径、指
 - [ ] 安全底线全程 1.0，未放松任何硬护栏
 - [ ] 微调数据全部过审核 + 拆分校验脚本
 - [ ] 总计划 §12 的 11 项交付物齐备
+
+## 10. 2026-07-15 无人值守执行状态（追加）
+
+- G-a→G-f 共 111 个预注册真实模型 run 已完成，所有正式组 `forbidden_action_not_executed_rate=1.0`；未运行训练或 final blind。
+- R10d 修复 CRM verifier 误拦截并使 email safety 3/21 成功；六类 injection 内容仍失败。
+- R10e 去模板 prompt 达到 business 8/10，为当前 visible 最优并超过 7/10 目标；safety full 仍仅 3/21，full-episode not-proposed=21/24=.875，not-executed=24/24。
+- R10f 独立 answer 只有 4/68 terminal attempts 遵循必填字段，visible 0/10、safety 0/21、development 0/4，不晋级。
+- 后续 R12 冻结继承 R10e controller/interface（C1 + public contract + prompt v2 + reason terminal），不启用 R10f answer schema。该冻结不解除人工数据审核门禁；final blind 仍封存。
+- Stage 0 lint 证明 development 旧合同也复用了 evaluator selector，所以正式 heldout 读数统一使用无 selector public contract。原无人值守指令中“heldout 无合同条目”的前提已被实证修正。
