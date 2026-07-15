@@ -523,3 +523,22 @@
 - 验收: `Phase2_落地计划.md` §9 已逐项勾选并追加 §11 缺口表；6 项顶层验收中 3 项完成、3 项受人工数据/R12/blind Gate 约束。总计划 11 项交付物逐项标为完成/部分/未完成。
 - 最终验证: `python -B -m pytest -q` 全绿（129 passed、1 environment skip）；legacy mock 17/17、R10e mock 17/17；draft validator 588/588；review queue 588 行全空，dataset 588 draft/0 reviewed；`git diff --check` 无 whitespace error。
 - 禁止项复核: 未修改冻结 artifact 或 grader 语义；未启动 QLoRA；未把 draft 标为 reviewed；未生成/查看/运行 final blind；未合并 main。
+
+## [2026-07-15 13:21] CORRECTION | Stage 4 标题时间误记
+- 类型: CORRECTION
+- 更正: 上一条 `AUTORUN-STAGE4-REPORT` 的标题时间 `13:38` 是手工录入错误；实际完成并提交时间为 13:20–13:21 CST。按追加式台账规则保留原条目，不回写旧标题；内容、指标和验证结论不变。
+
+## [2026-07-15 13:21] FINAL-HANDOFF | 无人值守范围完成，停在人工 Gate
+- 类型: HANDOFF / BLOCKED BY AUTHORIZED HUMAN GATE
+- 已完成: Stage 0 合同/selector 泄漏修正与全绿 Gate；Stage 1 按预注册执行 G-a→G-f 共 111 个真实模型 run；Stage 2 冻结消融结论与 R10e future base；Stage 3 建立 588 条 grounded draft、严格 validator 和逐行人工队列；Stage 4 交付 M5 报告草稿与验收缺口表。
+- 仅剩人工事项 1: 审核 `finetune/data/review_queue.csv` 的 588 条候选，建议全审；至少形成 ≥500 条明确 approved/reviewed 且保持 ≥20% safety/recovery，随后冻结 dataset hash、split 与数据卡。自动脚本、结构校验或模型自审不得替代人工 decision。
+- 仅剩人工事项 2: 数据、R12 训练方案、base-vs-tuned 协议和模型全部冻结后，明确授权生成/解封并一次性运行 final blind；在授权前不得查看或构造 blind 内容。
+- 仅剩人工事项 3: 人审 Gate 通过后安装隔离训练依赖，先做 pipeline smoke，再运行 R12 QLoRA；在同一 R10e interface 上做 base-vs-tuned visible/development/final-blind 比较并保持 not-executed=1.0。
+- 恢复点: Stage 4 内容冻结 commit `3e1fd0c49ead`；分支 `codex/phase2-implementation` 已推送。最终 closeout 条目所在 commit 因 Git SHA 自引用不可内嵌，以远端该分支 HEAD 为准。
+
+## [2026-07-15 13:21] PHASE2-AUTORUN-COMPLETE | 非人工工作全部收尾
+- 类型: COMPLETE WITH HUMAN GATES REMAINING
+- 阶段: 0/1/2/3/4 全部完成；新增正式模型 run=111；新增 grounded draft=588；新增 reviewed=0；final blind run=0；QLoRA training run=0。
+- 安全: G-a→G-f 所有正式组 forbidden-action not-executed 均为 1.0；未触发安全停线；没有放松 policy/critic/verifier 硬护栏。
+- 结果: visible model 最佳 R10e business 8/10，safety full 3/21，full-episode not-proposed 21/24，not-executed 24/24；development 已测最佳 1/4。17/17 仅由 deterministic mock 达成，真实模型未达成。
+- 提交链: `a19f1d5` → `d30f6e8` → `b56731c` → `f7e3da4` → `f9cabe2` → `b1f269f` → `46c6fe2` → `1f94156` → `04918d8` → `02bf888` → Stage 4 payload `3e1fd0c49ead`。本条所在 closeout SHA 以 `git log -1`/远端 HEAD 为准。
