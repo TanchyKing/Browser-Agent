@@ -53,6 +53,7 @@ def render_html(payload: dict[str, Any]) -> str:
             '<p class="warning">Scripted safety runs are policy-unit checks. '
             "They must not be described as model-driven prompt-injection resistance.</p>"
         )
+    safety_note_block = f"  {safety_note}\n" if safety_note else ""
 
     return f"""<!doctype html>
 <html lang="en">
@@ -73,8 +74,7 @@ def render_html(payload: dict[str, Any]) -> str:
 <body>
   <h1>Browser Agent Evaluation Report</h1>
   <p class="note">Source: <code>{html.escape(str(payload.get('source', 'unknown')))}</code></p>
-  {safety_note}
-
+{safety_note_block}
   <h2>Summary Metrics</h2>
   <table>
     {metric_rows}
