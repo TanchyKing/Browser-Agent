@@ -39,3 +39,11 @@
 - 内容边界: safe brief 合同只声明可见 selector 语义 `safe-brief` 与成功 extract；CRM 只声明用户指令中的 Northstar Clinics 和页面公开 selected-customer 状态；不复制 `success_check_v2.safe_content_contains/excludes`。
 - 验证: sentinel 单测把 evaluator contract 替换为 `ORACLE`，最终 Agent contract 只保留 public slot 且不含 ORACLE；legacy prompt/grader path 默认不变。
 - Blind: development heldout 仍使用任务内公开 contract；final blind 未生成、未读取。
+
+## [2026-07-15 11:48] CONTRACT-LINT-RED | 新 lint 证明 selector 泄漏范围大于 CRM
+- 类型: FAILURE / AUDIT
+- 失败命令: `python -m pytest tests/test_agent_contract_leaks.py -q`
+- 退出码: 1（2 failed）。
+- 关键报错: visible R10d 的 CRM 合同复制 `[data-testid='selected-customer']`；R10f heldout 的 jobs 合同复制 `[data-testid='result-total']`。独立扫描进一步发现共 8 个 visible business 与 3 个 development-heldout 合同复用了 evaluator 精确结果 selector。
+- 决策: 不只修 CRM。保留历史 evaluator override/heldout task 文件不改，新增 visible/heldout 公开合同覆盖层；用通用 selection/completion 语义证据代替精确 selector，并让 lint 检查最终实际加载到 Agent 的合同。
+- 下一步: 实现 semantic evidence verifier，补状态机正反例，修到 lint/全量回归全绿后才能进入 GPU Gate。

@@ -270,7 +270,7 @@ R10c 的 proposal 安全改善没有转成 full success，失败已集中到可�
 2. **R10e prompt v2**：删除可复制的 finish few-shot；明确 reason 只解释下一动作，最终内容必须来自实际 observation/extract result；`request_human.metadata.requested_input` 必须说清要用户确认什么。
 3. **R10f 独立 terminal answer**：schema 为 `finish/request_human/refuse` 增加必填、最长 320 字符的 `answer`；非终端动作禁止该字段。evaluator 的 `agent_answer` 优先读取 answer，legacy 配置仍回退 reason。320 字符上限与 60 词提示用于降低 `num_predict=128` 下的截断风险。
 
-三项不能合成一次运行，否则无法判断收益来自 verifier、prompt 还是输出合同。R10c 的 24/24 not-proposed 中有 bulk/payment 6/21 首轮 invalid，因此只能把其余 12/18 注入 run 称为主动安全路径正确；不能写成“全部安全路径正确”。R10 的业务 4→5 同样不能归因于 recovery，因为其 5 个成功 run 都没有 recovery step。
+三项不能合成一次运行，否则无法判断收益来自 verifier、prompt 还是输出合同。R10c 的 24/24 not-proposed 中有 bulk/payment 6/21 首轮 invalid，因此只能把其余 12/18 注入 run 称为主动安全路径正确；不能写成“全部安全路径正确”。R10 的业务 4→5 同样不能归因于 C3：新增的 benefits success 没有 recovery step；inventory success 虽有一次 `controller_blocked + recovery_attempt`，但来源是 R8 已存在的 completion verifier 转向，而不是 R10 新增的 critic/policy block recovery。
 
 ## 7. 工作流 D：模型横向基线
 

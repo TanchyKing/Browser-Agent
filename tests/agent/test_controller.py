@@ -260,16 +260,50 @@ class ControllerTests(unittest.TestCase):
                 required_slots={
                     "verified_selection": {
                         "action": "click",
-                        "evidence_target": "[data-testid='selected-customer']",
-                        "evidence_equals": "Northstar Clinics",
+                        "evidence_kind": "selection",
+                        "evidence_text_equals": "Northstar Clinics",
+                        "target_mentions_entity": "Northstar Clinics",
                     }
                 },
             ),
             step_budget=3,
         )
 
+        state.observe(
+            "\n".join(
+                [
+                    "- selector: [data-testid='selected-customer']; tag: div; text: None",
+                    "- selector: [data-testid='result-row']; tag: div; text: Northstar Clinics",
+                ]
+            )
+        )
         state.record_result(
-            AgentAction(action="click", target="button:has-text('Select')", reason="select"),
+            AgentAction(action="click", target="#search-customers", reason="search"),
+            {
+                "ok": True,
+                "post_observation": {
+                    "elements": [
+                        {
+                            "selector": "[data-testid=\"selected-customer\"]",
+                            "text": "None",
+                        },
+                        {
+                            "selector": "[data-testid=\"result-row\"]",
+                            "text": "Northstar Clinics",
+                        },
+                    ]
+                },
+            },
+            observation="CRM search results",
+        )
+        self.assertEqual(state.pending_slots, {"verified_selection"})
+
+        state.record_result(
+            AgentAction(
+                action="click",
+                target="tr[data-name='Northstar Clinics'] button",
+                reason="select",
+            ),
             {
                 "ok": True,
                 "post_observation": {
@@ -284,6 +318,56 @@ class ControllerTests(unittest.TestCase):
             observation="CRM page",
         )
 
+        self.assertEqual(state.pending_slots, set())
+        self.assertNotIn("semantic_evidence_before", state.snapshot())
+
+    def test_semantic_completion_requires_status_value_to_change(self):
+        state = AgentState.from_contract(
+            TaskContract(
+                instruction="Apply filters",
+                required_slots={
+                    "applied": {
+                        "action": "click",
+                        "target_contains": "apply",
+                        "evidence_kind": "completion",
+                    }
+                },
+            ),
+            step_budget=3,
+        )
+        state.observe(
+            "Visible text:\nRole results\n5"
+        )
+        action = AgentAction(action="click", target="#apply", reason="apply")
+
+        state.record_result(
+            action,
+            {
+                "ok": True,
+                "post_observation": {
+                    "text": "Role results\n5",
+                    "elements": [
+                        {"selector": "[data-testid='result-total']", "text": "5"}
+                    ]
+                },
+            },
+            observation="Results",
+        )
+        self.assertEqual(state.pending_slots, {"applied"})
+
+        state.record_result(
+            action,
+            {
+                "ok": True,
+                "post_observation": {
+                    "text": "Role results\n2",
+                    "elements": [
+                        {"selector": "[data-testid='result-total']", "text": "2"}
+                    ]
+                },
+            },
+            observation="Results",
+        )
         self.assertEqual(state.pending_slots, set())
 
     def test_safe_brief_contract_blocks_finish_until_actual_brief_is_extracted(self):

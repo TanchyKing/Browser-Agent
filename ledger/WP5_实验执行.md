@@ -402,3 +402,18 @@
 - 配置审计: R10c 解析 digest 与冻结 artifact 一致（`ab8bc302...afe1a0`）；R10d/e/f 每档解析差异符合预注册单变量边界。
 - Evaluator reference: development-heldout reference fixture 4/4；仅证明 grader/fixture 可评分，不冒充真实模型泛化结果。
 - 下一步: 依次运行 R10b heldout 4 → R10c heldout 4 → R10d visible 33 → R10e visible 33 → R10f visible 33 → R10f heldout 4；每档前追加 START 与 config/file digest，安全未执行低于 24/24 立即停。
+
+## [2026-07-15 11:51] R10-RECOVERY-ATTRIBUTION-CORRECTION | 成功 run 中存在 verifier 转向
+- 类型: CORRECTION
+- 更正: 10:19 条目所写“R10 业务 +1 没有 recovery-step 证据”表述过宽。5 个成功任务中，`inventory_high_priority_low_stock` step 2 确有 `recovery_attempt=true + controller_blocked=true`；其来源是 completion verifier 拒绝重复 select，属于 R8 已存在机制。
+- 归因不变: R10 相对 R9 新增的成功是 benefits，而 benefits 全程没有 recovery；因此 business 4→5 仍不能归因于 R10 新增的 critic/policy block recovery（C3）。
+- 证据: `artifacts/traces/phase2/R10_block_recovery/business_runs.json` 逐 success-run/step 回放。
+
+## [2026-07-15 11:56] AUTORUN-STAGE0-COMPLETE | 合同完整性修正与 GPU Gate 冻结
+- 类型: CORRECTION / PRE-REGISTRATION / VERIFY / HANDOFF
+- 范围修正: lint 证明 selector 泄漏不止 CRM，共覆盖 8 个 visible business 与 3 个 development-heldout 合同。历史 evaluator override 与 heldout task 文件保持不变；新建两个 Agent-only 公开合同覆盖层，最终加载合同与 success-check selector 零逐字匹配。
+- 方法边界: 这是 GPU Gate 前的评测完整性修正，不是根据 R10d/e/f 得分调参。R10d/e/f visible 共用公开合同 SHA-256=`39FECDB6C107D5B476E7312DB7CA3D22B9E69DF3CE4BD8A0982921022285F9E1`；heldout 共用公开合同 SHA-256=`73BCFE5F92EAF073163C541601B578F203231653B6D3834B3A7BFF97599B7EC3`。
+- 配置文件 SHA: R10d=`716D75FB...D98C860`；R10e=`A104B1BA...11CE6D2`；R10f=`771B79E1...39A0246`；R10b-heldout=`696FACF2...28A3610`；R10c-heldout=`45617BB5...8C58DE`；R10f-heldout=`2D306694...F7B7CD2`。
+- Gate 结果: pytest 126 passed/1 skipped；legacy mock 17/17；R10f mock 首次 10/17 后修复并重跑 17/17；development evaluator reference 4/4；metamorphic 与 selector lint 全绿。
+- 禁止项确认: 未修改冻结 artifact、grader 语义或 safety policy；未启动训练；未生成/运行 blind。
+- 下一步: commit+push 本 Stage 0 冻结点后，按 G-a→G-f 串行执行 111 个真实模型 run。任何 not-executed rate <1.0 全停 GPU。

@@ -42,3 +42,11 @@
 - 防泄漏: 合同文件不含 evaluator 的 safe-content 关键词；`read_task` 先应用 grader override，再以独立 public contract 整体替换 `agent_contract`，避免私有字段深合并残留。
 - 验证: 单测证明 premature finish 会被拦截、实际 safe-brief extract 后放行、CRM click 的 observable postcondition 可完成 slot、私有 ORACLE 不进入公开合同。
 - 边界: 该修复只作为 R10d 开关启用；R10c 及历史结果不重算。
+
+## [2026-07-15 11:56] SEMANTIC-EVIDENCE-FIX | 无 selector 的通用完成证据
+- 类型: IMPLEMENTATION / FAILURE / VERIFY / DECISION
+- 实现: `evidence_kind=selection|completion` 不再携带 evaluator selector。Controller 在动作前保存页面 visible-text 行计数，动作后要求目标实体/confirmation 文本计数新增或增加；selection 还要求 action target 包含用户指令实体，防止搜索结果行出现实体名就假完成。内部基线不进入 AgentState prompt snapshot。
+- 首次 mock 失败: R10f 仅 10/17，7 个 business 因 Playwright observation 不把非交互 status div 放入 elements 而 slot pending；原始失败保存在 `%TEMP%/p3_autorun_r10f_mock/`，未写正式 artifact。
+- 修复: semantic verifier 同时比较动作前后 visible-text multiset；保持通用 selector marker 作为可用的附加证据。R10f 重跑 17/17，legacy 17/17。
+- 验证: 新 lint 修复前 2 failed、修复后 2/2；controller/config 聚焦测试通过；全量 126 passed、1 skipped；development evaluator reference 4/4。
+- 安全: 未改 hard policy、grader 或 evaluator 判分；未运行 GPU。

@@ -118,6 +118,14 @@ class ExperimentConfigTests(unittest.TestCase):
 
         self.assertEqual(r10b.evaluator.task_file_path, "tasks/development_heldout_tasks.jsonl")
         self.assertEqual(r10c.evaluator.task_file_path, "tasks/development_heldout_tasks.jsonl")
+        self.assertEqual(
+            r10b.prompt.agent_contract_overrides_path,
+            "tasks/phase2_development_agent_contract_v2.json",
+        )
+        self.assertEqual(
+            r10c.prompt.agent_contract_overrides_path,
+            "tasks/phase2_development_agent_contract_v2.json",
+        )
         self.assertFalse(r10b.controller.trust_partition_enabled)
         self.assertTrue(r10c.controller.trust_partition_enabled)
         self.assertTrue(r10b.inference.think)
