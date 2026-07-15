@@ -223,7 +223,7 @@ RUN 条目（WP5）额外要求：完整开关快照、run artifact 路径、指
 
 ## 9. 验收对照（Phase 2 结束时逐项打勾）
 
-- [ ] R0–R12 完整消融表 + development held-out 差距表 + 最终 blind holdout 预注册结果（缺口：R12 与 final blind 受人工 Gate 约束；R10e 未跑 development）
+- [ ] R0–R12 完整消融表 + development held-out 差距表 + 最终 blind holdout 预注册结果（R0–R11b/R10g 与 development 已完成；缺口仅为受人工 Gate 约束的 R12 与 final blind）
 - [x] 四本以上 WP 台账 + `实验记录.md` 完整覆盖已执行实验
 - [x] legacy/v2 grader、contract prompt、全部 flag 可复现任意一个已执行 R 配置
 - [x] 安全底线全程 1.0，未放松任何硬护栏
@@ -236,26 +236,26 @@ RUN 条目（WP5）额外要求：完整开关快照、run artifact 路径、指
 - R10d 修复 CRM verifier 误拦截并使 email safety 3/21 成功；六类 injection 内容仍失败。
 - R10e 去模板 prompt 达到 business 8/10，为当前 visible 最优并超过 7/10 目标；safety full 仍仅 3/21，full-episode not-proposed=21/24=.875，not-executed=24/24。
 - R10f 独立 answer 只有 4/68 terminal attempts 遵循必填字段，visible 0/10、safety 0/21、development 0/4，不晋级。
-- 后续 R12 冻结继承 R10e controller/interface（C1 + public contract + prompt v2 + reason terminal），不启用 R10f answer schema。该冻结不解除人工数据审核门禁；final blind 仍封存。
+- 后续 R12 冻结继承 R10g observation + R10e controller/interface（C1 + public contract + prompt v2 + reason terminal），不启用 R10f answer schema。该冻结不解除人工数据审核门禁；final blind 仍封存。
 - Stage 0 lint 证明 development 旧合同也复用了 evaluator selector，所以正式 heldout 读数统一使用无 selector public contract。原无人值守指令中“heldout 无合同条目”的前提已被实证修正。
 
 ## 11. 2026-07-15 验收缺口明细（追加）
 
 | 总计划 §12 交付物 | 状态 | 证据或缺口 |
 |---|---|---|
-| 1. 可复现 baseline 与改进 artifacts | 已完成（截至 R11b/R10f） | `configs/phase2/`、`artifacts/traces/phase2/`；R12 待 Gate |
+| 1. 可复现 baseline 与改进 artifacts | 已完成（截至 R11b/R10g） | `configs/phase2/`、`artifacts/traces/phase2/`；R12 待 Gate |
 | 2. A0 trace schema | 已完成 | raw preview、`done_reason`、token/request config 已进入 artifacts |
 | 3. 逐 run error analysis | 已完成 | 各 R summary/report 与 `R02_R10_ablation_summary.md` |
 | 4. schema-constrained Agent | 已完成 | bounded schema、retry 与 grounding tests |
 | 5. state/verifier/recovery runner | 已完成 | R7b–R10e 实现、单测与消融 |
-| 6. visible/development/final blind | 部分完成 | visible 与 development 已有读数；R10e development、final blind 缺失 |
+| 6. visible/development/final blind | 部分完成 | R10g visible 33 + development 4 已完成；final blind 缺失 |
 | 7. 人工审核微调数据 | 未完成 | 588 draft、0 reviewed；队列与指南已就绪 |
 | 8. LoRA/QLoRA adapter | 未完成 | 明令禁止在无人值守阶段启动训练 |
 | 9. 强模型对照与 offload 说明 | 已完成（接口诊断） | R11/R11b；不是干净能力上界 |
 | 10. 消融报告与最终 dashboard | 部分完成 | 完整消融总表、`docs/phase2_report_draft.md` 已有；最终 dashboard 待 R12/blind |
 | 11. 来源、泛化、安全结论 | 阶段性完成 | 报告明确 visible 增益、heldout 缺口与安全三层边界；最终结论待 blind |
 
-无人值守可做的阶段 0–4 已完成。剩余工作严格限定为：人工审核数据；审核冻结后授权 R12 QLoRA；模型与方案冻结后授权 final blind。当前不满足 Phase 2 最终结项条件，也不满足“17 个完整测试全部通过”。
+无人值守工程与 R10g GPU Gate 已完成。R10g 在 17 个唯一 visible 任务中通过 16 个，并达到全部阶段数值目标；剩余工作严格限定为人工审核数据、审核冻结后授权 R12 QLoRA、模型与方案冻结后授权 final blind。当前仍不满足最终结项或“17 个完整测试全部通过”。
 
 ## 12. 2026-07-16 GPU 前工程 Gate（追加）
 
@@ -263,6 +263,13 @@ RUN 条目（WP5）额外要求：完整开关快照、run artifact 路径、指
 - [x] 冻结 R10g visible 33 + development 4 的新条件；不回填 R10e，安全停止线仍为 not-executed=1.0。
 - [x] 建立 588 条统一 `semantic_completion` 人审层及 R10e/R10f 双渲染；历史 53 条 seed 继续废弃。
 - [x] 明示 corpus 在 observation fix 后生成，与 R10g 对齐、与冻结 R10d/e/f observation 不一致。
-- [ ] 用户释放 GPU 后执行 R10g 37 runs；在结果出来前不审核、不训练、不运行条件分支 R10h/R10i。
+- [x] R10g 37 runs 已按 business 12 → safety 21 → 红线 → development 4 完成：11/12、21/21、3/4；not-proposed/not-executed 均 24/24。
 
-条件分支已预注册但不自动触发：只有 R10g trace 证明剩余问题属于 terminal interface，才运行 R10h（只加 answer）；只有 R10h 仍以 missing-answer 为主，才运行 R10i（只把 retry 改为 bounded）。未提取 safe brief、未 finish、重复动作或 proposal 问题不能靠 answer 路径解释。
+条件分支判定：R10g 的 safety evidence/terminal 已完整通过；剩余 visible 失败是跨页漏 extract，development 失败是 premature-save 后 verifier recovery。二者都不属于 terminal answer，因此 R10h 不触发，R10i 随之不触发。详细见 `artifacts/traces/phase2/R10e_R10g_comparison.md`。
+
+## 13. 2026-07-16 R10g GPU Gate 结果（追加）
+
+- 当前正式 visible 最佳：business 9/10、supported 11/12、safety full 21/21、not-proposed 24/24、not-executed 24/24；按唯一任务为 16/17。
+- Development：3/4（business 2/3、injection 1/1），不是 final blind。
+- 37 runs 全部生成 `done_reason=stop`，truncation=0、最终 invalid=0；8B 实测 100% GPU，延迟与此前 8B 条件可比。
+- R12 训练基线固定为 R10g observation + reason terminal；588 条语义队列仍为 0 reviewed，未经人工审核不得训练或解封 blind。
