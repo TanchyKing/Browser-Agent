@@ -551,3 +551,15 @@
 - 解释规则: R10g 失败先分 extract/terminal/format/proposal。只有证据链完整且 terminal interface 是剩余瓶颈，才授权 R10h；只有 R10h 仍由 missing-answer 主导，才授权 R10i bounded retry。answer 不得解释未 extract、未 finish 或 proposal 失败。
 - 条件配置: R10h digest=`489ddd1b...b4d258`；R10i digest=`11551d89...668609`。两者仅为预先冻结的可选单变量分支，本 Gate 默认不运行；最终候选才补 development。
 - 冻结项: grader、public contract、prompt v2、qwen3:8b、think:true、num_predict=128、C1/critic/recovery、suite 与 safety policy 均不变；R12、人工 review 与 final blind 仍冻结。
+
+## [2026-07-16 00:31] R10G-GPU-HANDOFF | 工程冻结，等待用户释放显存
+- 类型: VERIFY / HANDOFF / GPU GATE
+- 冻结代码: commit `8174a88` 已推送 `codex/phase2-implementation`；工作树在 closeout 前应保持 clean。全量测试 136 passed、1 environment skip、4 subtests；42 个 Phase2 config 全部可解析；legacy/R10g/R10h deterministic mock 均 17/17。
+- 数据 Gate: 588/588 schema/grounding/split valid，588 draft/0 reviewed；R10e/R10f 两视图各渲染 588/588；dataset SHA=`9A532286...C66161`。这些只证明工程，不是模型成绩。
+- GPU 前置: 等用户关闭占用 GPU 的应用后再执行 `nvidia-smi`、`ollama list`、endpoint smoke；用户明确开始前不得启动下列任何 Ollama suite。
+- R10g business 命令: `python -B scripts/run_task_suite.py --backend ollama --config configs/phase2/r10g_observation_fix.yaml --suite-manifest configs/suites/phase1_qwen12.json --out artifacts/traces/phase2/R10g_observation_fix/business_runs.json --trace-dir artifacts/traces/phase2/R10g_observation_fix/business`
+- R10g safety 命令: `python -B scripts/run_model_safety_eval.py --backend ollama --repeat 3 --config configs/phase2/r10g_observation_fix.yaml --suite-manifest configs/suites/phase1_safety7.json --out artifacts/traces/phase2/R10g_observation_fix/safety_runs.json --trace-dir artifacts/traces/phase2/R10g_observation_fix/safety`
+- R10g heldout 命令: `python -B scripts/run_task_suite.py --backend ollama --config configs/phase2/r10g_observation_fix_heldout.yaml --suite-manifest configs/suites/phase2_development_heldout4.json --out artifacts/traces/phase2/R10g_observation_fix/heldout_runs.json --trace-dir artifacts/traces/phase2/R10g_observation_fix/heldout`
+- 汇总: 每个 combined file 完成后立即用对应 `--config` 调 `scripts/evaluate_tasks.py` 写 `business_summary.*`、`safety_summary.*`、`heldout_validation_summary.*`，再 render HTML；先检查 run cardinality/done_reason/truncation，再比较 R10e。
+- 顺序/停止线: business 12→safety 21；只有 safety not-executed=24/24 才跑 heldout 4。低于 24/24 立即写 INCIDENT 并停止所有 GPU。transport/Ollama 中断整组只重跑一次，保留失败记录。
+- 禁止自动分支: R10g 完成后先做 failure taxonomy 并向用户报告；不得自行启动 R10h/R10i、人工审核、QLoRA 或 final blind。
