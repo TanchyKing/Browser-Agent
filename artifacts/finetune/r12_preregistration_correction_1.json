@@ -1,0 +1,57 @@
+{
+  "protocol_version": 1,
+  "status": "frozen_before_single_smoke_retry",
+  "corrected_at": "2026-07-16T09:10:00+08:00",
+  "original_preregistration_commit": "a2af0ef033c2dd3930c40fd53b57bf43f7eca5cd",
+  "original_preregistration_sha256": "35801ea534dc8130d21a2cfafec4b90324489b0b336267ba1670de8b358f1487",
+  "failure": {
+    "stage": "smoke_import_before_model_download_or_gpu_training",
+    "exception": "ImportError: DLL load failed while importing pyarrow.lib: application control policy blocked this file",
+    "model_weights_downloaded": false,
+    "optimizer_steps_completed": 0,
+    "output_artifacts_created": false,
+    "classification": "infrastructure_dependency_block"
+  },
+  "correction": {
+    "implementation": "manual_torch_peft_no_pyarrow_v1",
+    "description": "Replace datasets/TRL SFTTrainer plumbing with torch.utils.data.DataLoader, a direct PyTorch optimization loop, and PEFT QLoRA so Windows Application Control does not load unsigned PyArrow DLLs.",
+    "requirements_removed": ["trl", "datasets", "pyarrow_transitive_dependency"],
+    "training_code_sha256": "898a37a2c6df0e1e940fb8b529f0a5e9342e71e985cf378666c3db885338bef2",
+    "preflight_code_sha256": "642f1679c453fe26dd146fb232888a3854d0c769b35a5639f50725a4170dffda",
+    "requirements_sha256": "0605a356d53834ef3cbcf56fea30feb4625985893ed881bd0df1120d3c61efce",
+    "preflight": {
+      "ready": true,
+      "cuda": "12.8",
+      "gpu": "NVIDIA GeForce RTX 5070 Laptop GPU",
+      "compute_capability": "12.0",
+      "bf16_cuda_matmul": true,
+      "pip_check": "passed"
+    },
+    "regression": "136 passed, 1 skipped, 4 subtests passed"
+  },
+  "frozen_semantics_unchanged": {
+    "model_names_and_revisions": true,
+    "dataset_path_digest_and_split": true,
+    "internal_test_excluded": true,
+    "max_lengths": true,
+    "optimizer_steps_and_learning_rate": true,
+    "seed": true,
+    "per_device_batches_and_gradient_accumulation": true,
+    "gradient_checkpointing_and_bf16": true,
+    "nf4_double_quantization": true,
+    "lora_rank_alpha_dropout_targets": true,
+    "linear_scheduler_zero_warmup": true,
+    "eval_and_save_cadence": true,
+    "grader_controller_blind_protocol": true
+  },
+  "implementation_notes": {
+    "labels": "All non-padding tokens in the frozen text field participate in causal-language-model loss, matching the preregistered full-sequence SFT objective.",
+    "evaluation": "Validation remains every 50 optimizer steps; a final-step validation is also run so the two-step smoke verifies the evaluation path without changing optimization.",
+    "checkpointing": "Adapter, tokenizer, optimizer and scheduler state are saved every 50 formal steps; the final adapter and metrics are always saved on success."
+  },
+  "retry": {
+    "infrastructure_retry_limit": 1,
+    "next_smoke_attempt_consumes_retry": true,
+    "no_further_automatic_retry_after_next_attempt": true
+  }
+}

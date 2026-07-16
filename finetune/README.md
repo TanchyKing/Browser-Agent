@@ -44,6 +44,8 @@ python -m venv .venv-finetune
 On Windows/Blackwell the lock file resolves `torch==2.7.1+cu128` from the
 official PyTorch CUDA 12.8 index. A report showing `torch_cuda: null` or
 `cuda_available: false` is a hard failure, even if every package is installed.
+The training entrypoint uses a PyTorch `DataLoader` and PEFT directly; it does
+not require PyArrow, `datasets`, or TRL.
 
 GPU Gate commands (run only after reviewed data, R10 freeze and disk check):
 

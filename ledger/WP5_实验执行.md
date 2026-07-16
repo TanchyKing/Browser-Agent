@@ -616,3 +616,18 @@
 - 指标/红线: primary=business success、full safety success、forbidden not-executed；not-executed 必须为 1.0。两个模型都完成前不看逐任务分数，一次性解封；之后禁止改 controller、grader、数据、超参数。
 - 解释义务: 数据的 invoice/benefits 槽位值零多样性风险必须与 development/blind 结果联合报告；记忆型失败不能通过删样本或二次训练掩盖。
 - 机器可读冻结: `artifacts/finetune/r12_preregistration.json`。下一步提交本 PREREG；提交成功前不启动 smoke。
+
+## [2026-07-16 09:03] R12-SMOKE-START | Qwen3-0.6B 两步 QLoRA pipeline
+- 类型: GPU GATE / SMOKE
+- 前置: PREREG commit=`a2af0ef033c2dd3930c40fd53b57bf43f7eca5cd` 已推送且本地=远端；smoke 输出目录开始前不存在；GPU used=1361 MiB、free=6442 MiB。
+- 冻结命令投影: model=`Qwen/Qwen3-0.6B@c1899de289a04d12100db370d81485cdf75e47ca`；dataset SHA=`96A5609B...953AC70`；max_length=512、max_steps=2、lr=2e-4；其余 NF4/LoRA/batch 参数继承已提交训练入口。
+- 目的/边界: 仅验证 revision 下载、4-bit load、SFTTrainer、forward/backward、adapter/metrics 保存；不计 R12 分数，不生成 blind。失败只修复基础设施或已冻结入口的实现 bug，任何参数变更必须先追加 CORRECTION。
+
+## [2026-07-16 09:10] R12-SMOKE-FAILURE / PREREG-CORRECTION-1 | PyArrow 被 Application Control 阻断
+- 类型: INFRASTRUCTURE FAILURE / APPEND-ONLY CORRECTION / GPU GATE
+- 失败边界: 第一次 smoke 在 `datasets -> pyarrow.lib` 导入阶段报 `ImportError: DLL load failed ... 应用程序控制策略已阻止此文件`；发生于模型权重下载、4-bit load、CUDA forward/backward 和 optimizer step 之前，训练步=0，输出目录/训练产物均未创建。
+- 根因: 环境中的 `arrow.dll` 无 Authenticode 签名，Windows Application Control 拒绝加载；文件不存在 Zone.Identifier，解除下载标记不能修复。该失败归类为冻结入口的数据依赖实现问题，不是模型、数据或超参数结果。
+- 纠正: 训练入口改为 `torch.utils.data.DataLoader + PyTorch optimizer + PEFT QLoRA`，移除不再使用的 TRL/datasets/PyArrow 依赖。训练仍使用完整 `text` causal LM loss，train=486、validation=68、internal_test=34 排除；NF4、LoRA、batch/accumulation、checkpointing、BF16、lr、seed、steps、eval/save cadence 全部不变。仅增加 final-step validation，使 2-step smoke 可覆盖评估路径，不参与优化。
+- 新冻结哈希: train=`898A37A2C6DF0E1E940FB8B529F0A5E9342E71E985CF378666C3DB885338BEF2`；preflight=`642F1679C453FE26DD146FB232888A3854D0C769B35A5639F50725A4170DFFDA`；requirements=`0605A356D53834EF3CBCF56FEA30FEB4625985893ED881BD0DF1120D3C61EFCE`；训练数据仍为 `96A5609B...953AC70`。
+- 验证: 训练栈真实 import 不触发 PyArrow；CUDA 12.8 / RTX 5070 / BF16 matmul 通过，pip check 无冲突；pytest 136 passed、1 skipped、4 subtests。机器可读追加纠正为 `artifacts/finetune/r12_preregistration_correction_1.json`，原 PREREG 文件与条目不回改。
+- 重试边界: 先提交并推送本纠正冻结点，再执行唯一一次 smoke 基础设施重试；该重试后不再自动改参数或再次重跑。Blind 仍未生成或读取，grader/controller 未修改。
