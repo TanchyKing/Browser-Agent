@@ -668,3 +668,8 @@
 - 后台边界: 下载由隐藏后台进程运行，独立 runtime/log，不依赖 Codex 会话存活。Gate 1 全绿后才生成完整 `pip freeze` 锁、提交推送；Gate 2/3 开始前分别追加 START。
 - 实现冻结: downloader SHA=`D88B5C1D...404501`；supervisor=`AA8602A9...2E95D`；manifest=`94AF52F8...BEC32C`；pytest 136 passed、1 skipped、4 subtests。
 - 机器可读纠正: `artifacts/finetune/r12_preregistration_correction_2.json`。本条与脚本先提交推送，之后才启动 Gate 1 后台下载。
+
+## [2026-07-16 13:18] CORRECTION-2-GIT-DIRECT-OUTAGE | 启动冻结改用本地不可变提交
+- 类型: INFRASTRUCTURE CORRECTION / HANDOFF
+- 事实: CORRECTION-2 已提交为 `798aac7`；按用户要求以 `git -c http.proxy= -c https.proxy= push` 直连 GitHub 连续两次均被 `Recv failure: Connection was reset` 拒绝。未改用代理，尚未启动下载。
+- 边界纠正: 上一条“先提交推送再启动”的本地保守要求改为“本地 commit 冻结后可启动后台下载”；用户原要求仍保持——Gate 1 不得标记 COMPLETE、不得进入 Gate 2，直至直连 push 成功并确认 local=remote。该纠正不改变任何实验或下载变量。
