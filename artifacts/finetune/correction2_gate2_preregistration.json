@@ -1,0 +1,76 @@
+{
+  "protocol_version": 1,
+  "status": "frozen_before_gate2_probe",
+  "frozen_at": "2026-07-17T00:40:00+08:00",
+  "authority": "User authorized Gate 2 continuation and 127.0.0.1:7897 proxy push in the active Codex task.",
+  "gate1": {
+    "completion_commit": "2203727",
+    "audit_commit": "ffd229556fa81823e68ebaa1afde2bd1b429bba6",
+    "remote_head_verified": "ffd229556fa81823e68ebaa1afde2bd1b429bba6",
+    "push_proxy": "http://127.0.0.1:7897"
+  },
+  "probe": {
+    "script": "finetune/probe_qlora_offline.py",
+    "script_sha256": "544a1ebc82927ff0ddd5202b7c370b5ee149052c302fbc0eb042d61fd6a92509",
+    "model_path": "D:\\OllamaModels\\hf-cache\\hub\\models--Qwen--Qwen3-8B\\snapshots\\b968826d9c46dd6066d109eabc6255188de91218",
+    "model_revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "dataset": "finetune/data/processed/sft_r10e_reviewed.jsonl",
+    "dataset_sha256": "96a5609b8db8ee67dcd1b935be8baca2b4e64b947b80b4fe7d05dfcdd953ac70",
+    "output_dir": "artifacts/finetune/correction2_gate2_preflight",
+    "environment": {
+      "HF_HOME": "D:\\OllamaModels\\hf-cache",
+      "HF_HUB_OFFLINE": "1",
+      "TRANSFORMERS_OFFLINE": "1",
+      "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+    },
+    "optimizer_steps": 3,
+    "micro_batches": 24,
+    "max_length": 1024,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 8,
+    "learning_rate": 0.0002,
+    "formal_scheduler_steps": 500,
+    "optimizer": "torch.optim.AdamW",
+    "weight_decay": 0.0,
+    "gradient_checkpointing": true,
+    "quantization": {
+      "load_in_4bit": true,
+      "type": "nf4",
+      "compute_dtype": "bfloat16",
+      "double_quant": true
+    },
+    "lora": {
+      "r": 16,
+      "alpha": 32,
+      "dropout": 0.05,
+      "bias": "none",
+      "target_modules": "all-linear"
+    },
+    "pass_conditions": [
+      "All model and tokenizer loads use the local snapshot with local_files_only=true.",
+      "hf_device_map exists and every value is CUDA; no cpu or disk mapping is permitted.",
+      "Exactly 3 optimizer steps and 24 micro-batches complete without OOM.",
+      "A machine-readable result records peak allocated and reserved CUDA memory."
+    ]
+  },
+  "baseline": {
+    "gpu": "NVIDIA GeForce RTX 5070 Laptop GPU",
+    "memory_used_mib": 1433,
+    "memory_free_mib": 6370,
+    "ollama_models_loaded": 0,
+    "regression": "139 passed, 1 skipped, 9 subtests passed"
+  },
+  "oom_rule": {
+    "automatic_amendment_forbidden": true,
+    "if_oom": "Stop, append a PREREG-AMENDMENT, and change only max_seq_len, micro_batch, or gradient_accumulation before a new probe.",
+    "all_other_changes_forbidden": true
+  },
+  "scope_assertions": {
+    "training_data_changed": false,
+    "formal_lora_configuration_changed": false,
+    "formal_step_count_or_learning_rate_changed": false,
+    "controller_changed": false,
+    "grader_changed": false,
+    "blind_generated_or_read": false
+  }
+}

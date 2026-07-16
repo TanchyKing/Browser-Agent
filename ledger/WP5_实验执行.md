@@ -689,3 +689,12 @@
 - 有界重试: Gate 1 完成提交后按 `git -c http.proxy= -c https.proxy= push origin codex/phase2-implementation` 再试 3 次，均约 20 s 后返回 `Recv failure: Connection was reset`；加上完成前 3 次，共 6 次。无代理 `curl https://github.com` 同样在 TLS/HTTP 阶段无响应，而 TCP 443 可建立，故诊断为 GitHub 直连网络通道阻塞，不是仓库、提交或凭据错误。
 - 决策: 遵守用户“直连 push”与逐 Gate commit+push 要求，不改走本机全局代理，不进入 Gate 2。恢复条件仅为规定的直连 push 成功并确认 local=remote，或用户显式修改 push 授权。
 - 保持边界: 8B 离线加载/显存探针未开始，GPU 未用于训练；正式配置、数据、controller、grader、blind 仍全部冻结。
+
+## [2026-07-17 00:40] CORRECTION-2-GATE2-START | 离线全 GPU 3-step 探针冻结
+- 类型: USER-AUTHORIZED GPU PREFLIGHT / PRE-REGISTRATION
+- Gate 1 恢复: 用户明确授权 `127.0.0.1:7897` 代理 push；本地 4 个提交已成功推送，远端与本地均为 `ffd2295`。该授权只改变 Git 传输路径，不改变实验变量。
+- 离线边界: 固定 snapshot=`D:\OllamaModels\hf-cache\hub\models--Qwen--Qwen3-8B\snapshots\b968826d9c46dd6066d109eabc6255188de91218`；强制 `HF_HUB_OFFLINE=1`、`TRANSFORMERS_OFFLINE=1`、`local_files_only=true`。任何 `hf_device_map` 的 CPU/disk/非 CUDA 映射均立即失败。
+- 探针配置: 仅 scratch/preflight；max_length=1024、3 optimizer steps、batch=1×accumulation 8（24 micro-batches）、AdamW lr=2e-4/weight_decay=0、formal linear scheduler horizon=500、BF16 checkpointing、NF4 double quant、LoRA 16/32/.05 all-linear。dataset SHA=`96a5609b...53ac70`，486 train rows；不保存 adapter，不计 R12 结果。
+- 实现冻结: `finetune/probe_qlora_offline.py` SHA=`544a1ebc...a92509`；专用测试与全量回归 `139 passed, 1 skipped, 9 subtests`。机器预注册=`artifacts/finetune/correction2_gate2_preregistration.json`。
+- 资源起点: GPU used/free=1433/6370 MiB，Ollama 无模型驻留。若真实 OOM，必须停止并先追加 PREREG-AMENDMENT，且只允许 seq_len/micro-batch/grad-accum；其余冻结项禁止变化。
+- 边界: 探针成功前不启动正式 500-step 训练；controller/grader/blind 不接触，blind 未生成或读取。
