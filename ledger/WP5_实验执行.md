@@ -603,3 +603,16 @@
 - 最终 preflight: packages torch=2.7.1+cu128、transformers=4.53.2、trl=0.19.1、peft=0.16.0、accelerate=1.8.1、bitsandbytes=0.46.1、datasets=3.6.0；CUDA 12.8 available，RTX 5070 Laptop、compute capability 12.0、`sm_120` 已进入 arch list；BF16 CUDA matmul 成功；free disk=159.74 GiB；`ready=true`，pip check 无冲突。
 - 可复现性补强: 训练/merge 脚本新增必填 Hugging Face revision；训练会在 GPU 前写 dataset SHA、环境、量化/LoRA/batch 配置，并保存 metrics 与 trainer state。正式 revision 候选已由官方 Hub 元数据解析为 Qwen3-8B `b968826d9c46dd6066d109eabc6255188de91218`；smoke Qwen3-0.6B=`c1899de289a04d12100db370d81485cdf75e47ca`。
 - 下一 Gate: 先提交本环境与脚本冻结，再追加独立 R12-PREREG（引用提交 SHA、数据/grader digest 与完整超参数）；PREREG 提交前不得启动 smoke。
+
+## [2026-07-16 09:00] R12-PREREG | 数据、训练、部署与 blind 比较点冻结
+- 类型: EXPERIMENT PRE-REGISTRATION / GPU GATE
+- 冻结代码: authorization=`ce82a9c`；R10g controller=`02c54be906c48e1e82ba503a87ca9f7b4d0fa6dc`；R10g result=`1058b0ce439a06567d3d41d819ac1daddc753561`；训练环境/入口=`5bd88ae11dcb88089aa81f85aabb7297f0384d16`。R10g resolved config digest=`bb234242...f95941c`。
+- Grader 冻结: v2 composite SHA-256=`9EE96323240D527EB34056313C5A3B183FD2F2C0CEB5719E52D398B52A2CF5BB`，覆盖 `run_demo.py`、`evaluate_tasks.py`、全部 `src/eval/*.py`、evaluator overrides、task schema 与 safety policy；训练/盲测后不得修改。
+- 数据冻结: canonical reviewed SHA=`5C54151A...59B52D`；draft manifest=`446F518B...41DC1D`；review queue=`9CB01BBE...8875E`；唯一训练文件 `sft_r10e_reviewed.jsonl` SHA=`96A5609B...953AC70`，588 rows，split 486/68/34，safety/recovery=130/588。禁止并入 historical 53 seed、development 或 blind。
+- Smoke: `Qwen/Qwen3-0.6B@c1899de289a04d12100db370d81485cdf75e47ca`，同一训练文件，max_length=512、max_steps=2、lr=2e-4、output=`artifacts/finetune/smoke_qwen3_0_6b`；只验证 pipeline，不计 R12 分数。
+- Formal R12: `Qwen/Qwen3-8B@b968826d9c46dd6066d109eabc6255188de91218`；max_length=1024、max_steps=500、lr=2e-4、seed=42；batch=1、eval batch=1、grad accumulation=8、gradient checkpointing、BF16；eval/save=50；NF4 double-quant；LoRA r=16/alpha=32/dropout=.05/all-linear；CUDA allocator=`expandable_segments:True`。基础设施失败在未看 blind 分数前最多整体重试一次。
+- 部署冻结: CPU FP16 merge → Ollama experimental merged-safetensors import → Q4_K_M，模型名 `qwen3:8b-phase2-r12`；base 比较点仍是本地 `qwen3:8b` digest=`500a1f067a9f`。Blind 只含 `R10g_base` 与 `R12_fine_tuned`，repeat=1。
+- Blind 冻结边界: 任务族 jobs/invoice/benefits/injection；manifest schema SHA=`6A6C1900...F5EE2C`，protocol SHA=`77B14A2A...E1A85B`。suite hash 与 R12 model digest 只能在训练完成、evaluator-only 封存后追加到 blind prereg，不得回改本条。
+- 指标/红线: primary=business success、full safety success、forbidden not-executed；not-executed 必须为 1.0。两个模型都完成前不看逐任务分数，一次性解封；之后禁止改 controller、grader、数据、超参数。
+- 解释义务: 数据的 invoice/benefits 槽位值零多样性风险必须与 development/blind 结果联合报告；记忆型失败不能通过删样本或二次训练掩盖。
+- 机器可读冻结: `artifacts/finetune/r12_preregistration.json`。下一步提交本 PREREG；提交成功前不启动 smoke。
