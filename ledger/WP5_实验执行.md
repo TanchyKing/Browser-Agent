@@ -698,3 +698,12 @@
 - 实现冻结: `finetune/probe_qlora_offline.py` SHA=`544a1ebc...a92509`；专用测试与全量回归 `139 passed, 1 skipped, 9 subtests`。机器预注册=`artifacts/finetune/correction2_gate2_preregistration.json`。
 - 资源起点: GPU used/free=1433/6370 MiB，Ollama 无模型驻留。若真实 OOM，必须停止并先追加 PREREG-AMENDMENT，且只允许 seq_len/micro-batch/grad-accum；其余冻结项禁止变化。
 - 边界: 探针成功前不启动正式 500-step 训练；controller/grader/blind 不接触，blind 未生成或读取。
+
+## [2026-07-17 01:25] CORRECTION-2-GATE2-COMPLETE | 离线加载与 3-step 探针通过，发现 WDDM 分页瓶颈
+- 类型: GPU PREFLIGHT COMPLETE / PASS WITH PERFORMANCE WARNING
+- 完整性: 冻结本地 snapshot 以 offline/local-files-only 加载；`hf_device_map={"":"cuda:0"}`，无 CPU/disk/非 CUDA 映射。3/3 optimizer steps、24/24 micro-batches 全部完成，且每个真实输入均为 1024 tokens；无 OOM、无 failure artifact，因此没有触发或使用 PREREG-AMENDMENT。
+- 训练读数: loss `1.47355→1.31035→1.17636`，grad norm `1.87910→0.82921→0.47476`；step 累计耗时 `838.81/1655.52/2474.53 s`，总墙钟 2474.58 s。训练参数 43,646,976。
+- 显存: base load allocated/reserved=`6076724736/6287261696` bytes；峰值=`13016051200/13384024064` bytes。外部监控最大 used=7763 MiB、最小 free=40 MiB。CUDA allocator 口径明显超过物理 VRAM，而 `nvidia-smi` 贴近 WDDM 物理上限，符合 Windows GPU 虚拟/共享内存分页；它不是 HF device-map offload，但解释了极低吞吐。
+- 性能风险: 实测约 4.3644 optimizer steps/hour；线性外推 500 steps 仅训练约 114.56 h（4.77 天），尚不含每 50 steps 的 68-row validation、checkpoint、merge 与部署。Gate 2 的结构性 pass 不等于 Gate 3 在本机是“小时级可完成”。
+- 产物: scratch result SHA=`7359faed...c03b5`、log=`7e657000...5a36`、stdout=`e9f9090d...4a052`；机器摘要=`artifacts/finetune/correction2_gate2_summary.json`。探针不保存 adapter/checkpoint，不计 R12 结果。
+- 验证/边界: pip check 无冲突；pytest `139 passed, 1 skipped, 9 subtests`。正式 500-step 未启动，数据/LoRA/步数/lr/controller/grader/blind 均未变，blind 未生成或读取。Gate 2 完成后停止，等待 Gate 3 的既有 prereg save/resume 规则落地与后续决策。
