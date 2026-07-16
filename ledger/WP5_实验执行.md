@@ -682,3 +682,10 @@
 - 回归: 首次误用不含 pytest 的训练 venv，返回 `No module named pytest`，不属于测试失败；改用项目 Python 后 `136 passed, 1 skipped, 4 subtests passed`。未修改任何测试、训练数据或冻结配置。
 - Git 审计: Gate 完成提交前直连 push 累计第三次仍为 `Recv failure: Connection was reset`，未改用代理。完成提交后必须再次按规定直推并确认 local=remote；在此之前 Gate 2 仍禁止开始。
 - 边界: 未加载 8B、未占用训练 GPU、optimizer steps=0；数据/LoRA/500 steps/lr/controller/grader/blind 均未变化，blind 未生成或读取。
+
+## [2026-07-16 15:07] CORRECTION-2-GATE1-PUSH-BLOCKED | 直连 GitHub 门禁未通过
+- 类型: INFRASTRUCTURE BLOCK / HANDOFF
+- 本地封存: Gate 1 完成提交=`2203727`；连同前置 CORRECTION-2 提交，本地分支相对远端 `ab79096` 领先 3 个提交，工作内容完整且未改写。
+- 有界重试: Gate 1 完成提交后按 `git -c http.proxy= -c https.proxy= push origin codex/phase2-implementation` 再试 3 次，均约 20 s 后返回 `Recv failure: Connection was reset`；加上完成前 3 次，共 6 次。无代理 `curl https://github.com` 同样在 TLS/HTTP 阶段无响应，而 TCP 443 可建立，故诊断为 GitHub 直连网络通道阻塞，不是仓库、提交或凭据错误。
+- 决策: 遵守用户“直连 push”与逐 Gate commit+push 要求，不改走本机全局代理，不进入 Gate 2。恢复条件仅为规定的直连 push 成功并确认 local=remote，或用户显式修改 push 授权。
+- 保持边界: 8B 离线加载/显存探针未开始，GPU 未用于训练；正式配置、数据、controller、grader、blind 仍全部冻结。
