@@ -7,7 +7,9 @@ import hashlib
 import importlib.metadata
 import json
 import math
+import os
 import random
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -28,19 +30,56 @@ def _append_jsonl(path: Path, value: Any) -> None:
         handle.write(json.dumps(value, ensure_ascii=False) + "\n")
 
 
+def _json_sha256(value: Any) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _assert_fully_gpu_resident(device_map: dict[str, Any] | None) -> dict[str, str]:
+    if not device_map:
+        raise RuntimeError("hf_device_map is missing or empty")
+    normalized: dict[str, str] = {}
+    for name, value in device_map.items():
+        if isinstance(value, int) or str(value).isdigit():
+            normalized[name] = f"cuda:{value}"
+        else:
+            normalized[name] = str(value).lower()
+    non_cuda = {name: device for name, device in normalized.items() if not device.startswith("cuda:")}
+    if non_cuda:
+        raise RuntimeError(f"CPU/disk/non-CUDA device assignment detected: {non_cuda}")
+    return normalized
+
+
+def _resume_checkpoint_step(output_dir: Path, checkpoint: Path) -> int:
+    output_resolved = output_dir.resolve()
+    checkpoint_resolved = checkpoint.resolve()
+    if checkpoint_resolved.parent != output_resolved:
+        raise ValueError("Resume checkpoint must be a direct child of the frozen output directory")
+    match = re.fullmatch(r"checkpoint-(\d+)", checkpoint_resolved.name)
+    if not match:
+        raise ValueError("Resume checkpoint must be named checkpoint-<step>")
+    if not (checkpoint_resolved / "adapter").is_dir():
+        raise FileNotFoundError(f"Resume adapter is missing: {checkpoint_resolved / 'adapter'}")
+    if not (checkpoint_resolved / "training_state.pt").is_file():
+        raise FileNotFoundError(f"Resume state is missing: {checkpoint_resolved / 'training_state.pt'}")
+    return int(match.group(1))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="Qwen/Qwen3-8B")
     parser.add_argument("--revision", required=True)
+    parser.add_argument("--local-model-path", type=Path)
     parser.add_argument("--dataset", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--resume-from-checkpoint", type=Path)
     parser.add_argument("--max-length", type=int, default=1024)
     parser.add_argument("--max-steps", type=int, default=500)
     parser.add_argument("--learning-rate", type=float, default=2e-4)
     args = parser.parse_args()
 
     import torch
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+    from peft import LoraConfig, PeftModel, get_peft_model, prepare_model_for_kbit_training
     from torch.utils.data import DataLoader, Dataset
     from transformers import (
         AutoModelForCausalLM,
@@ -53,7 +92,17 @@ def main() -> int:
         raise RuntimeError("CUDA is required for this QLoRA gate")
     if args.max_steps <= 0 or args.max_length <= 0:
         raise ValueError("max-steps and max-length must be positive")
-    if args.output_dir.exists() and any(args.output_dir.iterdir()):
+    if args.local_model_path is None:
+        raise ValueError("Formal CORRECTION-2 training requires --local-model-path")
+    if os.environ.get("HF_HUB_OFFLINE") != "1" or os.environ.get("TRANSFORMERS_OFFLINE") != "1":
+        raise RuntimeError("HF_HUB_OFFLINE=1 and TRANSFORMERS_OFFLINE=1 are required")
+    model_source = args.local_model_path.resolve()
+    if not model_source.is_dir():
+        raise FileNotFoundError(f"Local model snapshot is missing: {model_source}")
+    resume_step_from_path = None
+    if args.resume_from_checkpoint is not None:
+        resume_step_from_path = _resume_checkpoint_step(args.output_dir, args.resume_from_checkpoint)
+    elif args.output_dir.exists() and any(args.output_dir.iterdir()):
         raise FileExistsError(f"Refusing to overwrite non-empty output directory: {args.output_dir}")
 
     dataset_bytes = args.dataset.read_bytes()
@@ -65,6 +114,49 @@ def main() -> int:
         raise ValueError("Dataset must contain train and validation records")
     if any(not isinstance(row.get("text"), str) or not row["text"] for row in rows):
         raise ValueError("Every dataset record must contain non-empty text")
+
+    run_identity = {
+        "implementation": "manual_torch_peft_no_pyarrow_offline_v2",
+        "model": args.model,
+        "revision": args.revision,
+        "local_model_path": str(model_source),
+        "dataset_sha256": hashlib.sha256(dataset_bytes).hexdigest(),
+        "dataset_counts": {
+            "train": len(train_rows),
+            "validation": len(validation_rows),
+            "internal_test_excluded": len(internal_test_rows),
+        },
+        "max_length": args.max_length,
+        "max_steps": args.max_steps,
+        "learning_rate": args.learning_rate,
+        "lr_scheduler": "linear",
+        "warmup_steps": 0,
+        "weight_decay": 0.0,
+        "max_grad_norm": 1.0,
+        "seed": SEED,
+        "quantization": {
+            "load_in_4bit": True,
+            "type": "nf4",
+            "compute_dtype": "bfloat16",
+            "double_quant": True,
+        },
+        "lora": {
+            "r": 16,
+            "alpha": 32,
+            "dropout": 0.05,
+            "bias": "none",
+            "target_modules": "all-linear",
+        },
+        "batching": {
+            "per_device_train_batch_size": 1,
+            "per_device_eval_batch_size": 1,
+            "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
+            "gradient_checkpointing": True,
+        },
+        "evaluation": {"eval_steps": EVAL_STEPS, "also_evaluate_at_final_step": True},
+        "saving": {"save_steps": SAVE_STEPS},
+    }
+    run_identity_sha256 = _json_sha256(run_identity)
 
     random.seed(SEED)
     torch.manual_seed(SEED)
@@ -87,8 +179,8 @@ def main() -> int:
         bnb_4bit_use_double_quant=True,
     )
     tokenizer = AutoTokenizer.from_pretrained(
-        args.model,
-        revision=args.revision,
+        str(model_source),
+        local_files_only=True,
         use_fast=True,
     )
     tokenizer.pad_token = tokenizer.pad_token or tokenizer.eos_token
@@ -125,12 +217,13 @@ def main() -> int:
     )
 
     model = AutoModelForCausalLM.from_pretrained(
-        args.model,
-        revision=args.revision,
+        str(model_source),
+        local_files_only=True,
         quantization_config=quantization,
         device_map="auto",
         torch_dtype=torch.bfloat16,
     )
+    device_map = _assert_fully_gpu_resident(getattr(model, "hf_device_map", None))
     model.config.use_cache = False
     model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=True)
     lora = LoraConfig(
@@ -141,12 +234,22 @@ def main() -> int:
         task_type="CAUSAL_LM",
         target_modules="all-linear",
     )
-    model = get_peft_model(model, lora)
+    if args.resume_from_checkpoint is None:
+        model = get_peft_model(model, lora)
+    else:
+        model = PeftModel.from_pretrained(
+            model,
+            str(args.resume_from_checkpoint / "adapter"),
+            is_trainable=True,
+            local_files_only=True,
+        )
     model.gradient_checkpointing_enable()
     model.enable_input_require_grads()
     model.train()
 
     input_device = model.get_input_embeddings().weight.device
+    if input_device.type != "cuda":
+        raise RuntimeError(f"Input embeddings are not on CUDA: {input_device}")
     trainable_parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
     optimizer = torch.optim.AdamW(trainable_parameters, lr=args.learning_rate, weight_decay=0.0)
     scheduler = get_scheduler(
@@ -159,48 +262,17 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     logs_path = args.output_dir / "log_history.jsonl"
     run_config = {
-        "implementation": "manual_torch_peft_no_pyarrow_v1",
-        "model": args.model,
-        "revision": args.revision,
+        **run_identity,
+        "run_identity_sha256": run_identity_sha256,
+        "offline": True,
+        "local_files_only": True,
+        "hf_device_map": device_map,
         "dataset": str(args.dataset),
-        "dataset_sha256": hashlib.sha256(dataset_bytes).hexdigest(),
-        "dataset_counts": {
-            "train": len(train_rows),
-            "validation": len(validation_rows),
-            "internal_test_excluded": len(internal_test_rows),
+        "resume_rule": {
+            "initial_run": "resume_from_checkpoint must be omitted",
+            "allowed_recovery": "only exact final checkpoint-50 with matching run identity",
+            "reason": "save_steps=50 and max_steps=50 create no earlier reproducible checkpoint",
         },
-        "max_length": args.max_length,
-        "max_steps": args.max_steps,
-        "learning_rate": args.learning_rate,
-        "lr_scheduler": "linear",
-        "warmup_steps": 0,
-        "weight_decay": 0.0,
-        "max_grad_norm": 1.0,
-        "seed": SEED,
-        "quantization": {
-            "load_in_4bit": True,
-            "type": "nf4",
-            "compute_dtype": "bfloat16",
-            "double_quant": True,
-        },
-        "lora": {
-            "r": 16,
-            "alpha": 32,
-            "dropout": 0.05,
-            "bias": "none",
-            "target_modules": "all-linear",
-        },
-        "batching": {
-            "per_device_train_batch_size": 1,
-            "per_device_eval_batch_size": 1,
-            "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
-            "gradient_checkpointing": True,
-        },
-        "evaluation": {
-            "eval_steps": EVAL_STEPS,
-            "also_evaluate_at_final_step": True,
-        },
-        "saving": {"save_steps": SAVE_STEPS},
         "packages": {
             name: importlib.metadata.version(name)
             for name in ("torch", "transformers", "peft", "accelerate", "bitsandbytes")
@@ -208,7 +280,13 @@ def main() -> int:
         "torch_cuda": torch.version.cuda,
         "gpu": torch.cuda.get_device_name(0),
     }
-    _write_json(args.output_dir / "run_config.json", run_config)
+    run_config_path = args.output_dir / "run_config.json"
+    if args.resume_from_checkpoint is None:
+        _write_json(run_config_path, run_config)
+    else:
+        existing_run_config = json.loads(run_config_path.read_text(encoding="utf-8"))
+        if existing_run_config.get("run_identity_sha256") != run_identity_sha256:
+            raise RuntimeError("Existing run_config does not match the frozen resume identity")
 
     def move_to_device(batch: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         return {name: tensor.to(input_device) for name, tensor in batch.items()}
@@ -229,14 +307,49 @@ def main() -> int:
         print(json.dumps(record), flush=True)
         return mean_loss
 
+    start_step = 0
+    prior_elapsed_seconds = 0.0
+    prior_peak_allocated = 0
+    prior_peak_reserved = 0
+    last_train_loss = math.nan
+    if args.resume_from_checkpoint is not None:
+        state = torch.load(
+            args.resume_from_checkpoint / "training_state.pt",
+            map_location="cpu",
+            weights_only=False,
+        )
+        if state.get("run_identity_sha256") != run_identity_sha256:
+            raise RuntimeError("Checkpoint state does not match the frozen run identity")
+        start_step = int(state.get("step", -1))
+        if start_step != resume_step_from_path:
+            raise RuntimeError("Checkpoint directory step and training state step disagree")
+        if start_step != args.max_steps:
+            raise RuntimeError(
+                "R12-50 recovery only permits checkpoint-50 after all training steps; "
+                "there is no earlier reproducible checkpoint"
+            )
+        optimizer.load_state_dict(state["optimizer"])
+        scheduler.load_state_dict(state["scheduler"])
+        prior_elapsed_seconds = float(state.get("elapsed_seconds", 0.0))
+        prior_peak_allocated = int(state.get("peak_gpu_memory_allocated_bytes", 0))
+        prior_peak_reserved = int(state.get("peak_gpu_memory_reserved_bytes", 0))
+        last_train_loss = float(state["last_train_loss"])
+        resume_record = {
+            "event": "resume",
+            "step": start_step,
+            "checkpoint": str(args.resume_from_checkpoint),
+            "run_identity_sha256": run_identity_sha256,
+        }
+        _append_jsonl(logs_path, resume_record)
+        print(json.dumps(resume_record), flush=True)
+
     torch.cuda.reset_peak_memory_stats()
     started = time.monotonic()
     optimizer.zero_grad(set_to_none=True)
     train_iterator = iter(train_loader)
     final_eval_loss: float | None = None
-    last_train_loss = math.nan
 
-    for step in range(1, args.max_steps + 1):
+    for step in range(start_step + 1, args.max_steps + 1):
         micro_losses: list[float] = []
         for _ in range(GRADIENT_ACCUMULATION_STEPS):
             try:
@@ -261,7 +374,7 @@ def main() -> int:
             "loss": last_train_loss,
             "grad_norm": float(grad_norm.detach().cpu()) if isinstance(grad_norm, torch.Tensor) else float(grad_norm),
             "learning_rate": scheduler.get_last_lr()[0],
-            "elapsed_seconds": round(time.monotonic() - started, 2),
+            "elapsed_seconds": round(prior_elapsed_seconds + time.monotonic() - started, 2),
         }
         _append_jsonl(logs_path, train_record)
         print(json.dumps(train_record), flush=True)
@@ -270,17 +383,34 @@ def main() -> int:
             checkpoint_dir = args.output_dir / f"checkpoint-{step}"
             model.save_pretrained(checkpoint_dir / "adapter")
             tokenizer.save_pretrained(checkpoint_dir / "adapter")
+            checkpoint_elapsed = prior_elapsed_seconds + time.monotonic() - started
             torch.save(
-                {"step": step, "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict()},
+                {
+                    "step": step,
+                    "optimizer": optimizer.state_dict(),
+                    "scheduler": scheduler.state_dict(),
+                    "run_identity_sha256": run_identity_sha256,
+                    "last_train_loss": last_train_loss,
+                    "elapsed_seconds": checkpoint_elapsed,
+                    "peak_gpu_memory_allocated_bytes": max(
+                        prior_peak_allocated, torch.cuda.max_memory_allocated()
+                    ),
+                    "peak_gpu_memory_reserved_bytes": max(
+                        prior_peak_reserved, torch.cuda.max_memory_reserved()
+                    ),
+                },
                 checkpoint_dir / "training_state.pt",
             )
         if step % EVAL_STEPS == 0 or step == args.max_steps:
             final_eval_loss = evaluate(step)
 
+    if start_step == args.max_steps:
+        final_eval_loss = evaluate(start_step)
+
     adapter_dir = args.output_dir / "adapter"
     model.save_pretrained(adapter_dir)
     tokenizer.save_pretrained(adapter_dir)
-    elapsed_seconds = time.monotonic() - started
+    elapsed_seconds = prior_elapsed_seconds + time.monotonic() - started
     metrics = {
         "train_steps": args.max_steps,
         "train_loss_last_step": last_train_loss,
@@ -290,8 +420,9 @@ def main() -> int:
             (args.max_steps * GRADIENT_ACCUMULATION_STEPS) / elapsed_seconds,
             6,
         ),
-        "max_gpu_memory_allocated_bytes": torch.cuda.max_memory_allocated(),
-        "max_gpu_memory_reserved_bytes": torch.cuda.max_memory_reserved(),
+        "max_gpu_memory_allocated_bytes": max(prior_peak_allocated, torch.cuda.max_memory_allocated()),
+        "max_gpu_memory_reserved_bytes": max(prior_peak_reserved, torch.cuda.max_memory_reserved()),
+        "resumed_from_checkpoint": str(args.resume_from_checkpoint) if args.resume_from_checkpoint else None,
     }
     _write_json(args.output_dir / "train_metrics.json", metrics)
     print(json.dumps({"event": "complete", **metrics}), flush=True)

@@ -1,0 +1,90 @@
+{
+  "protocol_version": 1,
+  "status": "authorized_and_frozen_before_r12_50_start",
+  "frozen_at": "2026-07-17T01:57:00+08:00",
+  "authority": "User explicitly authorized reducing the formal run to 50 steps for a half-day experiment in the active Codex task.",
+  "parent_preregistration": "artifacts/finetune/r12_preregistration.json",
+  "parent_correction": "artifacts/finetune/r12_preregistration_correction_2.json",
+  "gate2_summary_sha256": "88d66c603cf7a6a624732ccfe1dadf9000bd2590e466793e62b02051ba3bbe3e",
+  "experiment_id": "R12-50",
+  "interpretation": "R12-50 is a separately labeled short SFT condition and must not be represented as the original preregistered 500-step R12 result.",
+  "authorized_changes": {
+    "formal_optimizer_steps": {
+      "from": 500,
+      "to": 50
+    },
+    "linear_scheduler_horizon_steps": {
+      "from": 500,
+      "to": 50,
+      "reason": "Derived from the explicitly shortened final training horizon; learning rate reaches zero at step 50."
+    },
+    "output_dir": {
+      "from": "artifacts/finetune/R12_qwen3_8b_qlora",
+      "to": "artifacts/finetune/R12_50step_qwen3_8b_qlora",
+      "reason": "Preserve the original 500-step namespace and prevent result conflation."
+    }
+  },
+  "unchanged": {
+    "model": "Qwen/Qwen3-8B",
+    "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "local_snapshot": "D:\\OllamaModels\\hf-cache\\hub\\models--Qwen--Qwen3-8B\\snapshots\\b968826d9c46dd6066d109eabc6255188de91218",
+    "dataset": "finetune/data/processed/sft_r10e_reviewed.jsonl",
+    "dataset_sha256": "96a5609b8db8ee67dcd1b935be8baca2b4e64b947b80b4fe7d05dfcdd953ac70",
+    "max_length": 1024,
+    "learning_rate": 0.0002,
+    "seed": 42,
+    "micro_batch_size": 1,
+    "gradient_accumulation_steps": 8,
+    "gradient_checkpointing": true,
+    "bf16": true,
+    "eval_steps": 50,
+    "save_steps": 50,
+    "quantization": "NF4 4-bit, BF16 compute, double quantization",
+    "lora": "r=16, alpha=32, dropout=0.05, bias=none, all-linear",
+    "optimizer": "torch.optim.AdamW, weight_decay=0",
+    "controller_commit": "02c54be906c48e1e82ba503a87ca9f7b4d0fa6dc",
+    "grader_composite_sha256": "9ee96323240d527eb34056313c5a3b183fd2f2c0ceb5719e52d398b52a2cf5bb",
+    "blind_protocol": "unchanged and remains sealed until adapter/model digest freeze"
+  },
+  "offline_rule": {
+    "HF_HOME": "D:\\OllamaModels\\hf-cache",
+    "HF_HUB_OFFLINE": "1",
+    "TRANSFORMERS_OFFLINE": "1",
+    "local_files_only": true,
+    "hf_device_map_requirement": "all CUDA; cpu/disk/non-CUDA assignments are fatal"
+  },
+  "save_and_resume_rule": {
+    "initial_invocation": "Fresh output directory; --resume-from-checkpoint omitted.",
+    "checkpoint_schedule": "save_steps remains 50, so the only checkpoint is checkpoint-50, written after optimizer step 50 and before validation.",
+    "failure_before_checkpoint_50": "Stop. There is no reproducible checkpoint and no automatic restart is authorized.",
+    "allowed_resume": "Only if checkpoint-50 exists and the process failed after its save but before final validation/adapter/metrics completion.",
+    "resume_validation": "Checkpoint must be a direct child of the frozen output directory, contain adapter and training_state.pt, and match the frozen run_identity_sha256.",
+    "resume_behavior": "Load adapter plus optimizer/scheduler state, execute zero additional optimizer steps, then repeat/finalize validation and final artifact saving.",
+    "ledger_requirement": "Any resume must be appended to both ledgers before invocation."
+  },
+  "implementation": {
+    "train_script": "finetune/train_qlora.py",
+    "train_script_sha256": "43fd45ac94c241bdbdc450d49109a18fcc4b29c69d1e65f42d4c547e69e6898a",
+    "supervisor_script": "finetune/run_r12_50step.ps1",
+    "supervisor_sha256": "91e88772788b6b8790e892e5708e0e7dcc16292e022fe5c4dcfc6410aaa46f14",
+    "regression": "143 passed, 1 skipped, 14 subtests passed",
+    "pip_check": "No broken requirements found"
+  },
+  "resource_forecast": {
+    "gate2_optimizer_steps_per_hour": 4.3644,
+    "estimated_training_hours_excluding_eval_save_merge": 11.46,
+    "estimated_dataset_exposure_samples": 400,
+    "estimated_epochs": 0.823,
+    "gpu_baseline_used_mib": 340,
+    "gpu_baseline_free_mib": 7463,
+    "warning": "This is an under-one-epoch short SFT probe; format/interface learning may be measurable, but generalization can be undertrained."
+  },
+  "scope_assertions": {
+    "training_data_changed": false,
+    "lora_configuration_changed": false,
+    "learning_rate_changed": false,
+    "controller_changed": false,
+    "grader_changed": false,
+    "blind_generated_or_read": false
+  }
+}

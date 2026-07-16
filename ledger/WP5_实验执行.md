@@ -707,3 +707,12 @@
 - 性能风险: 实测约 4.3644 optimizer steps/hour；线性外推 500 steps 仅训练约 114.56 h（4.77 天），尚不含每 50 steps 的 68-row validation、checkpoint、merge 与部署。Gate 2 的结构性 pass 不等于 Gate 3 在本机是“小时级可完成”。
 - 产物: scratch result SHA=`7359faed...c03b5`、log=`7e657000...5a36`、stdout=`e9f9090d...4a052`；机器摘要=`artifacts/finetune/correction2_gate2_summary.json`。探针不保存 adapter/checkpoint，不计 R12 结果。
 - 验证/边界: pip check 无冲突；pytest `139 passed, 1 skipped, 9 subtests`。正式 500-step 未启动，数据/LoRA/步数/lr/controller/grader/blind 均未变，blind 未生成或读取。Gate 2 完成后停止，等待 Gate 3 的既有 prereg save/resume 规则落地与后续决策。
+
+## [2026-07-17 01:57] PREREG-AMENDMENT-R12-50 | 用户授权半日短训练
+- 类型: USER-AUTHORIZED FORMAL TRAINING AMENDMENT / GATE 3 PRE-REGISTRATION
+- 唯一能力变量: formal optimizer steps `500→50`；线性 scheduler horizon 作为派生量同步 `500→50`，lr 仍从 2e-4 在第 50 步衰减至 0。使用独立 experiment id=`R12-50` 与输出目录 `R12_50step_qwen3_8b_qlora`，禁止冒充原 500-step R12。
+- 其余冻结: Qwen3-8B revision/local snapshot、dataset SHA=`96a5609b...53ac70`、1024 tokens、seed 42、batch 1×accumulation 8、BF16 checkpointing、NF4 double quant、LoRA 16/32/.05 all-linear、AdamW/weight_decay=0、eval/save=50、controller/grader/blind 均不变。
+- 离线/驻留: 强制 HF/Transformers offline 与 local-files-only；`hf_device_map` 必须全 CUDA。正式入口 SHA=`43fd45ac...e6898a`，supervisor=`91e88772...a46f14`；pip check 与 pytest `143 passed, 1 skipped, 14 subtests`。
+- save/resume: fresh run 不带 resume。save_steps=50 保持不变，故唯一 checkpoint-50 在第 50 个 optimizer step 后、validation 前生成。此前中断无 checkpoint 且禁止自动重启；只有 checkpoint-50 已存在但 validation/final save 未完成时，才允许匹配 run identity 后加载 adapter+optimizer+scheduler、零新增 optimizer step 地完成收尾，且恢复前必须追加台账。
+- 资源/解释: Gate 2 实测外推纯训练约 11.46 h，另加 step-50 validation/checkpoint/收尾；400 个样本曝光约 0.823 epoch。该短训练适合观察格式/接口迁移，但可能欠训练，最终报告必须保留此限制。
+- 机器 amendment: `artifacts/finetune/r12_preregistration_amendment_50step.json`。本 amendment 与实现先 commit+push，确认 local=remote 后才允许后台启动；adapter/model digest 冻结前 blind 继续封存。
