@@ -594,3 +594,12 @@
 - Gate ③ Final blind: **授权生成与运行**，严格按 `tasks/blind_holdout_protocol.md`——由 evaluator-only 会话在上述全部冻结完成后生成并封存；preregistration.json 只含 R10g base 与 R12 fine-tuned 两个比较点；中途不得查看逐任务分数。
 - 解释边界: 槽位值零多样性发现要求 R12 结论必须同时报告 heldout 表现并引用该风险；若 heldout 出现值记忆型失败，不得删改样本后复跑掩盖，只能作为发现写入报告。
 - 剩余不可自动化事项: 无。项目所有者可随时抽查 review_queue.csv 与 reviewed 文件并撤销本放行。
+
+## [2026-07-16 08:58] R12-ENV-READY | 隔离训练栈与 reviewed 渲染通过
+- 类型: VERIFY / ENVIRONMENT GATE / CORRECTION
+- 数据复核: canonical reviewed 588/588 valid，split=486/68/34，SHA-256=`5C54151AE7C09381D8B447AF1F0BD7C3E48C16C237298EFAB4A7C5B37359B52D`；队列 588/588 approve。使用仓库 Python 渲染唯一 R10e 训练视图 `finetune/data/processed/sft_r10e_reviewed.jsonl`，588 rows、SHA-256=`96A5609B8DB8EE67DCD1B935BE8BACA2B4E64B947B80B4FE7D05DFCDD953AC70`、terminal answer key=0。
+- 安装审计: 首次默认 PyPI 安装在 216 MB torch wheel 下载 93.6 MB 时 read timeout；代理重试成功但得到 Windows CPU build `torch 2.7.1+cpu`，preflight 正确返回 `ready=false`。未启动训练或模型下载。
+- 环境纠正: 依据 PyTorch 官方 2.7.1 Windows/CUDA 12.8 安装指令，以官方 cu128 index 替换为同主版本 `torch 2.7.1+cu128`；requirements lock 已明确 CUDA wheel 来源。该纠正不改变模型、数据或训练超参数。
+- 最终 preflight: packages torch=2.7.1+cu128、transformers=4.53.2、trl=0.19.1、peft=0.16.0、accelerate=1.8.1、bitsandbytes=0.46.1、datasets=3.6.0；CUDA 12.8 available，RTX 5070 Laptop、compute capability 12.0、`sm_120` 已进入 arch list；BF16 CUDA matmul 成功；free disk=159.74 GiB；`ready=true`，pip check 无冲突。
+- 可复现性补强: 训练/merge 脚本新增必填 Hugging Face revision；训练会在 GPU 前写 dataset SHA、环境、量化/LoRA/batch 配置，并保存 metrics 与 trainer state。正式 revision 候选已由官方 Hub 元数据解析为 Qwen3-8B `b968826d9c46dd6066d109eabc6255188de91218`；smoke Qwen3-0.6B=`c1899de289a04d12100db370d81485cdf75e47ca`。
+- 下一 Gate: 先提交本环境与脚本冻结，再追加独立 R12-PREREG（引用提交 SHA、数据/grader digest 与完整超参数）；PREREG 提交前不得启动 smoke。

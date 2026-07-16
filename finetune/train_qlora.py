@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib.metadata
 import json
 from pathlib import Path
 
@@ -10,6 +12,7 @@ from pathlib import Path
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="Qwen/Qwen3-8B")
+    parser.add_argument("--revision", required=True)
     parser.add_argument("--dataset", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--max-length", type=int, default=1024)
@@ -35,10 +38,15 @@ def main() -> int:
         bnb_4bit_compute_dtype=torch.bfloat16,
         bnb_4bit_use_double_quant=True,
     )
-    tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model,
+        revision=args.revision,
+        use_fast=True,
+    )
     tokenizer.pad_token = tokenizer.pad_token or tokenizer.eos_token
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
+        revision=args.revision,
         quantization_config=quantization,
         device_map="auto",
         torch_dtype=torch.bfloat16,
@@ -78,9 +86,50 @@ def main() -> int:
         processing_class=tokenizer,
         peft_config=lora,
     )
-    trainer.train()
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    run_config = {
+        "model": args.model,
+        "revision": args.revision,
+        "dataset": str(args.dataset),
+        "dataset_sha256": hashlib.sha256(args.dataset.read_bytes()).hexdigest(),
+        "max_length": args.max_length,
+        "max_steps": args.max_steps,
+        "learning_rate": args.learning_rate,
+        "seed": 42,
+        "quantization": {
+            "load_in_4bit": True,
+            "type": "nf4",
+            "compute_dtype": "bfloat16",
+            "double_quant": True,
+        },
+        "lora": {
+            "r": 16,
+            "alpha": 32,
+            "dropout": 0.05,
+            "target_modules": "all-linear",
+        },
+        "batching": {
+            "per_device_train_batch_size": 1,
+            "per_device_eval_batch_size": 1,
+            "gradient_accumulation_steps": 8,
+            "gradient_checkpointing": True,
+        },
+        "packages": {
+            name: importlib.metadata.version(name)
+            for name in ("torch", "transformers", "trl", "peft", "accelerate", "bitsandbytes", "datasets")
+        },
+        "torch_cuda": torch.version.cuda,
+        "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+    }
+    (args.output_dir / "run_config.json").write_text(
+        json.dumps(run_config, indent=2),
+        encoding="utf-8",
+    )
+    train_result = trainer.train()
     trainer.save_model(str(args.output_dir / "adapter"))
     tokenizer.save_pretrained(str(args.output_dir / "adapter"))
+    trainer.save_metrics("train", train_result.metrics)
+    trainer.save_state()
     return 0
 
 

@@ -41,11 +41,15 @@ python -m venv .venv-finetune
 .venv-finetune\Scripts\python finetune/preflight.py
 ```
 
+On Windows/Blackwell the lock file resolves `torch==2.7.1+cu128` from the
+official PyTorch CUDA 12.8 index. A report showing `torch_cuda: null` or
+`cuda_available: false` is a hard failure, even if every package is installed.
+
 GPU Gate commands (run only after reviewed data, R10 freeze and disk check):
 
 ```powershell
-.venv-finetune\Scripts\python finetune/train_qlora.py --dataset finetune/data/processed/sft_reviewed.jsonl --output-dir artifacts/finetune/qwen3-8b-phase2 --max-length 1024 --max-steps 500
-.venv-finetune\Scripts\python finetune/merge_adapter.py --adapter artifacts/finetune/qwen3-8b-phase2/adapter --out artifacts/finetune/qwen3-8b-phase2/merged
+.venv-finetune\Scripts\python finetune/train_qlora.py --model Qwen/Qwen3-8B --revision b968826d9c46dd6066d109eabc6255188de91218 --dataset finetune/data/processed/sft_r10e_reviewed.jsonl --output-dir artifacts/finetune/R12_qwen3_8b_qlora --max-length 1024 --max-steps 500
+.venv-finetune\Scripts\python finetune/merge_adapter.py --base-model Qwen/Qwen3-8B --revision b968826d9c46dd6066d109eabc6255188de91218 --adapter artifacts/finetune/R12_qwen3_8b_qlora/adapter --out artifacts/finetune/R12_qwen3_8b_qlora/merged
 ```
 
 Convert the merged Hugging Face checkpoint with the pinned llama.cpp conversion tools, quantize to Q4_K_M, then place the GGUF next to `Modelfile.template` and run `ollama create`. Record llama.cpp commit, GGUF SHA-256 and Ollama model digest in the WP5 ledger.

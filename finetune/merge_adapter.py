@@ -8,6 +8,7 @@ import argparse
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-model", default="Qwen/Qwen3-8B")
+    parser.add_argument("--revision", required=True)
     parser.add_argument("--adapter", required=True)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
@@ -18,6 +19,7 @@ def main() -> int:
 
     base = AutoModelForCausalLM.from_pretrained(
         args.base_model,
+        revision=args.revision,
         torch_dtype=torch.float16,
         device_map={"": "cpu"},
         low_cpu_mem_usage=True,
