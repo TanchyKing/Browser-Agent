@@ -644,3 +644,9 @@
 - 性能: 纯训练与评估 15.67 s，约 1.0209 samples/s；CUDA peak allocated=2,336,335,360 bytes，peak reserved=2,634,022,912 bytes。首次模型下载总墙钟约 1122.7 s，期间 6 次 read timeout 均由 Hugging Face 客户端续传并最终完成。
 - 产物: adapter SHA=`D368A815...9BCA1`；run config=`EC8B870E...47F94`；metrics=`808A28F9...AFC3C`；log=`40EF5651...BC8985`。机器可读摘要 `artifacts/finetune/r12_smoke_summary.json`；大体积 smoke 目录按 `.gitignore` 留在本机。
 - 边界: 本结果只证明 pipeline 可运行，不计 R12 能力结果；grader/controller/数据未修改，blind 未生成或读取。唯一 smoke 基础设施重试已用完；下一步提交并推送 smoke 封存后，按原 PREREG 开始正式 8B 训练。
+
+## [2026-07-16 09:35] R12-FORMAL-START | Qwen3-8B 500-step QLoRA
+- 类型: GPU GATE / FORMAL TRAINING
+- 前置: smoke result commit=`fdfb1a599bc767895fafd08803aae1334e9ff8b5` 已推送且本地=远端；正式输出目录不存在；磁盘 free=158.27 GiB。关闭非必要桌面 GPU 应用后 used=1278 MiB、free=6525 MiB，Ollama 无模型驻留。
+- 冻结命令: `Qwen/Qwen3-8B@b968826d9c46dd6066d109eabc6255188de91218`；dataset SHA=`96A5609B...953AC70`；max_length=1024、max_steps=500、lr=2e-4；seed 42、batch=1、accumulation=8、BF16/checkpointing、NF4 double quant、LoRA 16/32/.05 all-linear、eval/save=50。
+- 边界: 仅使用 PREREG 与 CORRECTION-1 冻结的入口；不得改数据、参数、controller/grader。训练成功并封存 adapter/model digest 前不得生成 final blind；internal_test 继续排除。
