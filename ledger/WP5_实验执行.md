@@ -673,3 +673,12 @@
 - 类型: INFRASTRUCTURE CORRECTION / HANDOFF
 - 事实: CORRECTION-2 已提交为 `798aac7`；按用户要求以 `git -c http.proxy= -c https.proxy= push` 直连 GitHub 连续两次均被 `Recv failure: Connection was reset` 拒绝。未改用代理，尚未启动下载。
 - 边界纠正: 上一条“先提交推送再启动”的本地保守要求改为“本地 commit 冻结后可启动后台下载”；用户原要求仍保持——Gate 1 不得标记 COMPLETE、不得进入 Gate 2，直至直连 push 成功并确认 local=remote。该纠正不改变任何实验或下载变量。
+
+## [2026-07-16 15:01] CORRECTION-2-GATE1-COMPLETE | 镜像续传与双重校验通过
+- 类型: DOWNLOAD GATE COMPLETE / DEPENDENCY LOCK / VERIFY
+- 路由: 显式 `HF_HOME=D:\OllamaModels\hf-cache` 复用原缓存；首选 `hf-mirror.com` 进程内清空 proxy、workers=2、timeout=300，全部文件均在第一次尝试完成。fallback 未触发，`hf-xet` 未安装；后台运行 5609.4 s 后正常退出。
+- 权重校验: 两轮逐片 SHA-256 均与官方冻结 revision LFS OID 一致；5 片物理字节和=`16381516776`，index 张量字节=`16381470720`，差=`46056`，两种口径全绿。机器可读摘要=`artifacts/finetune/correction2_gate1_summary.json`。
+- 依赖闭包: `pip freeze --all` 生成 49 行 `finetune/requirements-full-lock.txt`，SHA=`8fb53848...3bd9dc`；`pip check` 无冲突。CUDA 12.8 / torch 2.7.1+cu128 / RTX 5070 / BF16 preflight ready，磁盘 free=142.99 GiB。
+- 回归: 首次误用不含 pytest 的训练 venv，返回 `No module named pytest`，不属于测试失败；改用项目 Python 后 `136 passed, 1 skipped, 4 subtests passed`。未修改任何测试、训练数据或冻结配置。
+- Git 审计: Gate 完成提交前直连 push 累计第三次仍为 `Recv failure: Connection was reset`，未改用代理。完成提交后必须再次按规定直推并确认 local=remote；在此之前 Gate 2 仍禁止开始。
+- 边界: 未加载 8B、未占用训练 GPU、optimizer steps=0；数据/LoRA/500 steps/lr/controller/grader/blind 均未变化，blind 未生成或读取。
