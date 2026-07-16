@@ -631,3 +631,16 @@
 - 新冻结哈希: train=`898A37A2C6DF0E1E940FB8B529F0A5E9342E71E985CF378666C3DB885338BEF2`；preflight=`642F1679C453FE26DD146FB232888A3854D0C769B35A5639F50725A4170DFFDA`；requirements=`0605A356D53834EF3CBCF56FEA30FEB4625985893ED881BD0DF1120D3C61EFCE`；训练数据仍为 `96A5609B...953AC70`。
 - 验证: 训练栈真实 import 不触发 PyArrow；CUDA 12.8 / RTX 5070 / BF16 matmul 通过，pip check 无冲突；pytest 136 passed、1 skipped、4 subtests。机器可读追加纠正为 `artifacts/finetune/r12_preregistration_correction_1.json`，原 PREREG 文件与条目不回改。
 - 重试边界: 先提交并推送本纠正冻结点，再执行唯一一次 smoke 基础设施重试；该重试后不再自动改参数或再次重跑。Blind 仍未生成或读取，grader/controller 未修改。
+
+## [2026-07-16 09:14] R12-SMOKE-RETRY-START | 唯一基础设施重试
+- 类型: GPU GATE / FROZEN RETRY
+- 冻结点: correction commit=`5d24b90d14740fd96591c9ef89770621eb4c7e07` 已推送且本地=远端；输出目录仍不存在；GPU used=1346 MiB、free=6457 MiB。
+- 命令参数: 与首次 smoke 相同的 `Qwen/Qwen3-0.6B@c1899de...e47ca`、R10e dataset `96A5609B...953AC70`、max_length=512、max_steps=2、lr=2e-4；仅使用已冻结的 no-PyArrow 实现。
+- 边界: 本次消耗 PREREG 允许的唯一基础设施重试。只验证下载、NF4/LoRA、forward/backward、validation 与 adapter/metrics 保存；不计 R12 分数，不接触 blind。
+
+## [2026-07-16 09:33] R12-SMOKE-COMPLETE | no-PyArrow QLoRA pipeline 通过
+- 类型: GPU GATE COMPLETE / VERIFY
+- 结果: 固定 Qwen3-0.6B revision 下载并以 NF4+LoRA 成功加载；完成 2/2 optimizer steps、最终 validation、adapter/tokenizer/metrics/log 保存，退出码=0。step loss 2.70997→2.08200，final eval loss=2.06702。
+- 性能: 纯训练与评估 15.67 s，约 1.0209 samples/s；CUDA peak allocated=2,336,335,360 bytes，peak reserved=2,634,022,912 bytes。首次模型下载总墙钟约 1122.7 s，期间 6 次 read timeout 均由 Hugging Face 客户端续传并最终完成。
+- 产物: adapter SHA=`D368A815...9BCA1`；run config=`EC8B870E...47F94`；metrics=`808A28F9...AFC3C`；log=`40EF5651...BC8985`。机器可读摘要 `artifacts/finetune/r12_smoke_summary.json`；大体积 smoke 目录按 `.gitignore` 留在本机。
+- 边界: 本结果只证明 pipeline 可运行，不计 R12 能力结果；grader/controller/数据未修改，blind 未生成或读取。唯一 smoke 基础设施重试已用完；下一步提交并推送 smoke 封存后，按原 PREREG 开始正式 8B 训练。
