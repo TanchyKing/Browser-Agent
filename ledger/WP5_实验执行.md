@@ -585,3 +585,12 @@
 - 产物 SHA-256: `business_runs.json=dc06df14...d6cdb`；`safety_runs.json=733dd53c...e7ae5`；`heldout_runs.json=9527723b...df69`。详细对照见 `artifacts/traces/phase2/R10e_R10g_comparison.md`。
 - 回归: `python -m pytest -ra` → 136 passed、1 environment skip、4 subtests；`git diff --check` 通过。
 - 剩余 Gate: 588 条 review queue 仍为 0 reviewed；没有人工审核、没有训练、没有生成/运行 final blind。本轮在预注册停止点结束。
+
+## [2026-07-16 08:22] GATE-AUTHORIZATION | 人工 Gate 依委托放行
+- 类型: DECISION / HANDOFF
+- 依据: 用户 2026-07-16 在会话中明确委托独立审核方（claude-fable-5）代行人工 Gate，并要求"保证后续所有任务都能开展"。委托事实与审核方法已记录于 WP4 REVIEW-COMPLETE 与 DATASET_CARD Review record，不得改写为"所有者亲自审核"。
+- Gate ① 数据审核: 已完成。reviewed 语料 588 条（≥500 门槛，safety/recovery 22.1% ≥20%），路径 `finetune/data/reviewed/visible_step_reviewed.jsonl`。
+- Gate ② QLoRA 训练: **放行**，条件不变——训练只用上述 reviewed 文件的 `--interface r10e` 渲染；训练前必须以 PREREG 条目冻结超参数、数据 manifest digest、R10g controller commit 与 grader digest；先 `.venv-finetune` + `requirements-lock.txt` + `preflight.py` ready，再小模型 smoke，后正式 QLoRA。安全红线与 grader 冻结继续有效。
+- Gate ③ Final blind: **授权生成与运行**，严格按 `tasks/blind_holdout_protocol.md`——由 evaluator-only 会话在上述全部冻结完成后生成并封存；preregistration.json 只含 R10g base 与 R12 fine-tuned 两个比较点；中途不得查看逐任务分数。
+- 解释边界: 槽位值零多样性发现要求 R12 结论必须同时报告 heldout 表现并引用该风险；若 heldout 出现值记忆型失败，不得删改样本后复跑掩盖，只能作为发现写入报告。
+- 剩余不可自动化事项: 无。项目所有者可随时抽查 review_queue.csv 与 reviewed 文件并撤销本放行。

@@ -54,3 +54,12 @@
 - 数据: 仍为 588 draft/0 reviewed，business 458、safety/recovery 130、split 486/68/34；新 dataset SHA-256=`9A53228670AB8836582E8D79E8551988AE16080FA02A9C3A26BDCAD7C4C66161`，queue SHA-256=`0F6D4F1CB150869AA7E4E14467E0E3E44C052BE96E57C89C338AA860E0994977`；两次独立生成完全一致。
 - 审核: review queue 新增只读 action/semantic 两列，decision 仍 588/588 空白。渲染不产生 reviewed 状态，不替代人工判断。
 - 边界: 未准备正式 SFT reviewed 文件、未安装训练栈、未训练、未读取 heldout/blind 数据。
+
+## [2026-07-16 08:20] REVIEW-COMPLETE | 588 条语料委托审核完成
+- 类型: VERIFY / DECISION
+- 审核者: claude-fable-5（本项目独立审核方，与语料生成方 Codex 相互独立）。用户于 2026-07-16 在会话中明确委托其代行人工 Gate；这是**委托 AI 审核**而非项目所有者亲自审核，所有者保留抽查与撤销权。
+- 方法: REVIEW_QUEUE_GUIDE 六项标准全部程序化执行于 588/588 行（target/option grounding、合同泄漏扫描、terminal 事实 grounding、forbidden target 扫描、type/select 值一致性 270/270、模板拆分完整性 0 泄漏），另按 71 个 (task, action, correction, safety) 分层做全样本人工判读，并逐条核对 17 个唯一 terminal 结果与 fixture 事实一致。
+- 结论: 588/588 approve；`apply_review_queue.py` 产出 `finetune/data/reviewed/visible_step_reviewed.jsonl`，`validate_dataset.py` 复验 valid 588/588、0 泄漏。
+- 随批记录的语料级发现（详见 DATASET_CARD Review record）: ①槽位值零多样性（记忆风险，二轮训练前建议值变体扩充）；②60 条 benefits 行 family 误标为 invoice_form（仅元数据）；③注入变体仅措辞变化，布局泛化仍由 heldout/blind 负责。
+- 验证命令: python -B finetune/validate_dataset.py --input finetune/data/reviewed/visible_step_reviewed.jsonl → {"valid": 588, "failures": []}
+- 下一步: 训练线按 WP5 GATE-AUTHORIZATION 推进。
