@@ -650,3 +650,11 @@
 - 前置: smoke result commit=`fdfb1a599bc767895fafd08803aae1334e9ff8b5` 已推送且本地=远端；正式输出目录不存在；磁盘 free=158.27 GiB。关闭非必要桌面 GPU 应用后 used=1278 MiB、free=6525 MiB，Ollama 无模型驻留。
 - 冻结命令: `Qwen/Qwen3-8B@b968826d9c46dd6066d109eabc6255188de91218`；dataset SHA=`96A5609B...953AC70`；max_length=1024、max_steps=500、lr=2e-4；seed 42、batch=1、accumulation=8、BF16/checkpointing、NF4 double quant、LoRA 16/32/.05 all-linear、eval/save=50。
 - 边界: 仅使用 PREREG 与 CORRECTION-1 冻结的入口；不得改数据、参数、controller/grader。训练成功并封存 adapter/model digest 前不得生成 final blind；internal_test 继续排除。
+
+## [2026-07-16 12:59] R12-FORMAL-DOWNLOAD-FAILURE | 网络续传耗尽，训练未开始
+- 类型: INFRASTRUCTURE FAILURE / BLOCKED GATE / HANDOFF
+- 失败: 固定 8B revision 通过 Hugging Face regular HTTP fallback 下载约 12,162 s；多次 `Read timed out` 自动续传后，最终以 `requests.exceptions.ChunkedEncodingError: IncompleteRead(13500224 bytes read, 3007574840 more expected)` 退出。上游为 `cas-bridge.xethub.hf.co`，环境未安装可选 `hf_xet`。
+- 精确边界: 失败发生在 `AutoModelForCausalLM.from_pretrained` 权重下载阶段；model load=false、optimizer steps=0、GPU training=false、正式输出目录不存在，没有 adapter/checkpoint/metrics。数据、超参数、controller/grader 均未修改，blind 未生成或读取。
+- 保留缓存: 预期权重 16,381,470,720 bytes；2/5 完整分片=4227.2 MiB，3 个部分分片=2020.0 MiB，合计 6247.2 MiB（39.99%）。缓存可续传，不删除、不伪装成训练产物。
+- 重试 Gate: CORRECTION-1 已明确唯一基础设施重试由 smoke 消耗并禁止随后自动重跑；因此本轮不自动启动第二次正式命令，也不安装新下载器。继续需用户显式授权新的追加式基础设施纠正/正式重试。
+- 产物: `artifacts/finetune/r12_formal_download_failure.json`。Phase 2 尚未完成：R12 adapter/model、evaluator-only final blind、base-vs-tuned 盲测与最终解封均未执行，安全红线没有被触发或违反。
