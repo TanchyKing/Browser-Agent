@@ -716,3 +716,10 @@
 - save/resume: fresh run 不带 resume。save_steps=50 保持不变，故唯一 checkpoint-50 在第 50 个 optimizer step 后、validation 前生成。此前中断无 checkpoint 且禁止自动重启；只有 checkpoint-50 已存在但 validation/final save 未完成时，才允许匹配 run identity 后加载 adapter+optimizer+scheduler、零新增 optimizer step 地完成收尾，且恢复前必须追加台账。
 - 资源/解释: Gate 2 实测外推纯训练约 11.46 h，另加 step-50 validation/checkpoint/收尾；400 个样本曝光约 0.823 epoch。该短训练适合观察格式/接口迁移，但可能欠训练，最终报告必须保留此限制。
 - 机器 amendment: `artifacts/finetune/r12_preregistration_amendment_50step.json`。本 amendment 与实现先 commit+push，确认 local=remote 后才允许后台启动；adapter/model digest 冻结前 blind 继续封存。
+
+## [2026-07-17 02:00] R12-50-FORMAL-START | 离线 50-step QLoRA 后台训练
+- 类型: FORMAL GPU TRAINING START / FROZEN SHORT CONDITION
+- 冻结点: amendment/implementation commit=`d54b1a7` 已通过用户授权的 `127.0.0.1:7897` 代理推送，local=remote。正式输出目录与 runtime 目录启动前均不存在。
+- 启动资源: GPU used/free=340/7463 MiB、温度 49°C，Ollama 无模型驻留；机器接通电源。使用隐藏独立 supervisor 与分离 stdout/stderr/status，Codex 会话中断不终止训练。
+- 命令边界: fresh run，不带 resume；完全离线本地 Qwen3-8B，R10e reviewed dataset，1024 tokens、50 steps、linear horizon=50、lr=2e-4、seed 42、batch 1×accumulation 8、BF16 checkpointing、NF4/LoRA 固定，eval/save=50。输出仅写新目录 `R12_50step_qwen3_8b_qlora`。
+- 停止线: 任意 CPU/disk device map、OOM、非零退出、数据/config identity 不匹配均停止；不自动重启。checkpoint-50 前中断没有 resume 权限。训练完成并冻结 adapter digest 前不生成或读取 final blind。
