@@ -1,0 +1,61 @@
+{
+  "protocol_version": 1,
+  "status": "authorized_before_gate1",
+  "authorized_at": "2026-07-16T13:10:00+08:00",
+  "authority": "explicit user authorization in the active Codex task",
+  "parent_failure_commit": "ab7909680f334a3160d18979141e88ab7867b207",
+  "scope": "Training-pipeline robustness only: download, dependency closure, offline loading, and the explicitly bounded Gate 2 OOM probe amendment.",
+  "implementation": {
+    "download_script_sha256": "d88b5c1d9b308e8cd2469f58713fa0b0066e7b92430c1eb45117fb3418404501",
+    "supervisor_script_sha256": "aa8602a93638f6f73384c98638243dd46998735e9354b08cf8857b4da982e95d",
+    "shard_manifest_sha256": "94af52f887e63e0bd4f1e624382c86d045b1f2d0e1217eaa27883982bbbec32c",
+    "regression": "136 passed, 1 skipped, 4 subtests passed"
+  },
+  "immutable": [
+    "training data and split",
+    "LoRA rank/alpha/dropout/target modules",
+    "formal optimizer step count",
+    "formal learning rate",
+    "controller",
+    "grader",
+    "blind protocol"
+  ],
+  "gate1": {
+    "hf_home": "D:\\OllamaModels\\hf-cache",
+    "cache_reuse_required": true,
+    "manifest": "artifacts/finetune/correction2_qwen3_8b_manifest.json",
+    "expected_total_tensor_bytes_from_index": 16381470720,
+    "expected_total_shard_file_bytes": 16381516776,
+    "preferred": {
+      "endpoint": "https://hf-mirror.com",
+      "proxy_environment_cleared": true,
+      "max_workers": 2,
+      "download_timeout_seconds": 300
+    },
+    "fallback": {
+      "endpoint": "https://huggingface.co",
+      "proxy": "http://127.0.0.1:7897",
+      "hf_xet_pin": "1.5.1",
+      "hf_xet_import_smoke_required": true,
+      "plain_http_if_blocked": true,
+      "plain_http_max_workers": 1,
+      "bounded_attempts_per_file": 8
+    },
+    "pass_condition": "All five physical shard sizes and official LFS SHA-256 values match, their file-byte sum equals 16381516776, and model.safetensors.index.json metadata.total_size equals 16381470720 tensor bytes."
+  },
+  "gate2": {
+    "offline_required": true,
+    "local_snapshot_required": true,
+    "no_cpu_or_disk_offload": true,
+    "probe_optimizer_steps": 3,
+    "probe_output_is_scratch_preflight": true,
+    "oom_amendment_only": ["max_seq_len", "micro_batch", "gradient_accumulation"],
+    "all_other_changes_forbidden": true
+  },
+  "gate3": {
+    "formal_optimizer_steps": 500,
+    "offline_required": true,
+    "save_and_resume_rule_must_be_preregistered_before_start": true,
+    "blind_only_after_training_and_model_digest_freeze": true
+  }
+}

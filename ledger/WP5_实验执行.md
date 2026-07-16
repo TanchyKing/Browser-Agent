@@ -658,3 +658,13 @@
 - 保留缓存: 预期权重 16,381,470,720 bytes；2/5 完整分片=4227.2 MiB，3 个部分分片=2020.0 MiB，合计 6247.2 MiB（39.99%）。缓存可续传，不删除、不伪装成训练产物。
 - 重试 Gate: CORRECTION-1 已明确唯一基础设施重试由 smoke 消耗并禁止随后自动重跑；因此本轮不自动启动第二次正式命令，也不安装新下载器。继续需用户显式授权新的追加式基础设施纠正/正式重试。
 - 产物: `artifacts/finetune/r12_formal_download_failure.json`。Phase 2 尚未完成：R12 adapter/model、evaluator-only final blind、base-vs-tuned 盲测与最终解封均未执行，安全红线没有被触发或违反。
+
+## [2026-07-16 13:10] PREREG-CORRECTION-2 | 下载、依赖闭包与离线训练解耦
+- 类型: USER-AUTHORIZED APPEND-ONLY CORRECTION / PRE-REGISTRATION
+- 授权范围: 仅修复下载/依赖/离线化；训练数据、LoRA、正式 500 steps、lr、controller、grader、blind 协议不变。Gate 2 只有真实 OOM 时才允许以新 PREREG-AMENDMENT 调整 seq_len/micro-batch/grad-accum，其他项禁止。
+- 缓存定位: `C:\Users\Tanch\.cache\huggingface` 不含 Qwen3-8B；`D:\OllamaModels\hf-cache` 含约 6262.3 MiB，故全程固定 `HF_HOME=D:\OllamaModels\hf-cache` 并续传，禁止删除已有分片。
+- 官方哈希: 通过代理查询冻结 revision `/tree/b968826d9c46dd6066d109eabc6255188de91218`；当前 main SHA 与冻结 SHA 相同。5 个 LFS OID 依次为 `31d6a825...cbf5f`、`5991236c...d18282`、`c5185c47...896836`、`b5ee7de7...aa917a`、`20c2d636...b542ff`，对应物理文件尺寸 3996250744/3993160032/3959604768/3187841392/1244659840，文件和=16381516776 bytes。Index `metadata.total_size=16381470720` 是张量载荷和，额外 46056 bytes 为 safetensors 头/元数据；Gate 同时校验两种口径。完整值见 `correction2_qwen3_8b_manifest.json`。
+- Gate 1 路由: 首选 `hf-mirror.com` 进程内清空 proxy、workers=2、timeout=300；失败后官方端点走 `127.0.0.1:7897`，固定安装 `hf-xet==1.5.1` 并 import smoke；若 WDAC 阻断则卸载并使用 plain HTTP workers=1、逐文件最多 8 次进程级续传。最终必须逐分片 size+SHA 与总字节全部一致。
+- 后台边界: 下载由隐藏后台进程运行，独立 runtime/log，不依赖 Codex 会话存活。Gate 1 全绿后才生成完整 `pip freeze` 锁、提交推送；Gate 2/3 开始前分别追加 START。
+- 实现冻结: downloader SHA=`D88B5C1D...404501`；supervisor=`AA8602A9...2E95D`；manifest=`94AF52F8...BEC32C`；pytest 136 passed、1 skipped、4 subtests。
+- 机器可读纠正: `artifacts/finetune/r12_preregistration_correction_2.json`。本条与脚本先提交推送，之后才启动 Gate 1 后台下载。
