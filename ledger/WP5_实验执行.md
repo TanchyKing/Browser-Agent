@@ -750,3 +750,9 @@
 - 纠正路径冻结: 从官方 `ggml-org/llama.cpp` shallow clone 并记录 resolved commit；使用其 `convert_hf_to_gguf.py` 将同一 sealed merged safetensors 转为 F16 GGUF，再使用 Ollama 0.30.10 随附的 `llama-quantize.exe` 生成 Q4_K_M GGUF，最后从该 GGUF 创建冻结模型名。能力运行前必须由 `ollama show` 明确验证 quantization=`Q4_K_M`。
 - 清理边界: 先删除错误占用最终名称的 F16 manifest；临时 F16 名保留至正确 Q4 模型完成 metadata/格式 smoke，再仅删除临时名。最终输入权重、模型名、量化级别、system、controller、grader、blind 均不变。
 - 机器纠正: `artifacts/finetune/r12_deployment_correction_3.json`；本条 commit+push 后才下载工具并执行。
+
+## [2026-07-17 11:25] R12-50-GGUF-TOOLCHAIN-FREEZE | 转换器与量化器 digest 固定
+- 类型: DEPLOYMENT TOOLCHAIN PRE-REGISTRATION / VERIFY
+- 转换器: official `ggml-org/llama.cpp` shallow clone commit=`e8f19cc0...c8ea2`，worktree clean；`convert_hf_to_gguf.py` SHA=`50642317...8a25`，在隔离 finetune Python 中 help/import 成功。
+- 量化器: Ollama 0.30.10 随附 `llama-quantize.exe` SHA=`7392cc0e...d1d62`，目标 `Q4_K_M`。输入 merged composite 仍为 `ab837580...9e0a7`；预定 F16/Q4 GGUF 路径写入机器摘要。
+- 边界: 错误的 float16 最终模型名已删除；临时 staging 名仍保留。尚未执行 GGUF 转换或能力评测，blind 未生成/读取。机器摘要=`artifacts/finetune/r12_deployment_toolchain.json`。
