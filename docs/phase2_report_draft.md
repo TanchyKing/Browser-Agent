@@ -1,5 +1,7 @@
 # P3 Phase 2 评测驱动 Agent 优化报告（草稿）
 
+> 本草稿已由 `docs/phase2_final_report.md` 取代；以下内容保留为 R12 训练前的历史快照，不再代表当前结论。
+
 > 状态：2026-07-16 已完成 R10g observation-fix 的 37 个正式 run；人工数据审核、R12 QLoRA、最终 blind holdout 尚未开始。本报告不是 Phase 2 最终结项报告。
 
 ## 1. 结论先行

@@ -787,6 +787,32 @@
 - Development: overall 1/4；三个未见业务变体 0/3，安全注入 1/1。R10g 同套为 3/4（业务 2/3、安全 1/1），泛化同样退化。
 - 解释/决策: 训练 loss 下降不等于 agent 能力提升；R12-50 不晋升为默认配置，R10g 保持当前可见最优。完整比较见 `artifacts/traces/phase2/R10g_R12_50_visible_comparison.md`。final blind suite 已在 visible 分数前由 evaluator-only 独立生成并封存，不允许依据本结果改题。
 
+## [2026-07-17 12:27] FINAL-BLIND-UNSEALED | R12-50 总分持平但业务归零
+- 类型: FINAL BLIND COMPLETE / ONE-TIME UNSEAL / SAFETY GATE PASS / NEGATIVE RESULT
+- 协议: suite/manifest/preregistration SHA 分别为 `7d7882ea...c06a6`、`198bfab4...6f432`、`1c8d5db9...6a243`。按冻结顺序仅运行 R10g base 与 R12-50 各一次，均为 8/8 run 完整；无基础设施重试。两个 run bundle 均加密完成后才一次性解封 aggregate，逐任务分数不发布，解封后禁止更改。
+- R10g base: overall 2/8；business 1/6；safety full 1/2；forbidden not-executed 2/2。
+- R12-50: overall 2/8；business 0/6；safety full 2/2；forbidden not-executed 2/2。总成功数持平，但 R12-50 丢失唯一 blind 业务成功并增加一个 safety full success，不能解释为总体提升。
+- 解释义务: invoice 与 benefits 训练数据在 family 内 slot-value diversity=0；visible 3/10、development 0/3 business、blind 0/6 business 的一致退化必须报告，不得通过改数据或重跑已解封 blind 掩盖。
+- 协议偏差: evaluator-only 在 suite/bundles/manifest/prereg 全部冻结后，为确认 ledger append 位置读取 tail，连带看见 preceding visible 结论；读取前后所有 blind hash 一致，未改题、未运行模型或解封评分，因此 suite 保留有效，但最终报告已披露。
+- 决策: R12-50 不晋升，R10g 继续作为默认 agent；final blind v1 已消耗，不得用于后续调参。完整结论见 `docs/phase2_final_report.md`，机器摘要见 `artifacts/finetune/r12_50_final_evaluation_summary.json`。
+
+## [2026-07-17 12:28] PHASE2-CLOSEOUT | 工程目标达成，微调候选不晋升
+- 类型: PHASE CLOSEOUT / COMPLETE WITH NEGATIVE MODEL RESULT
+- 达成: grader/observability/schema/controller/trust partition/observation 修复、R10g 16/17 visible、3/4 development、588 reviewed、R12-50 train/deploy、base-vs-tuned visible/development/final-blind 全链完成；所有安全停止线保持 1.0。
+- 未达成: 真实模型 17/17、R12-50 总体提升、blind 业务泛化、原 500-step R12。50-step 结果严格保持独立命名。
+- 发布判定: R10g 保留，R12-50 adapter/model/artifact 仅作研究负结果封存。任何下一轮训练属于新实验，必须重建多值完整轨迹数据并使用新的 blind v2。
+
+## [2026-07-17 12:30] POST-UNSEAL-TEST-CORRECTION | Mock 测试隔离真实 unseal marker
+- 类型: TEST INFRASTRUCTURE CORRECTION / NO SCORE CHANGE
+- 发现: final blind 解封后的首次全量回归为 149 passed、1 failed、1 skipped、14 subtests；唯一失败是 mock run 单测虽已把 runtime/final-score/unseal receipt 重定向到 `tmp_path`，却遗漏 `_external_unseal_marker`，因而读取真实工作区的已解封 marker 并按设计拒绝新 run。
+- 修复: 仅在 `test_mock_run_path_seals_unscored_output` 中把 `_external_unseal_marker` monkeypatch 到 `tmp_path`。不修改 evaluator 生产逻辑、suite、task、run bundle、grader、aggregate score 或 unseal receipt；post-unseal 不可变约束保持。
+- 复核: 全量回归 150 passed、1 skipped、14 subtests passed；blind `verify --deep` 仍通过且 `scores_unsealed=true`，final score SHA 仍为 `a89ef534...da25`。
+
+## [2026-07-17 12:31] PHASE2-FINAL-VERIFY | 结项产物与回归全绿
+- 类型: FINAL VERIFY
+- 验证: final evaluation summary、final score、unseal receipt、run receipts 均可解析；blind deep hash/schema/DPAPI 验证通过；`git diff --check` 通过；pytest 150 passed、1 skipped、14 subtests passed。
+- 状态: R10g 默认、R12-50 不晋升、blind v1 不再运行或计分。等待最终提交与 push 后结束 Phase 2。
+
 ## [2026-07-17 13:10] FINAL-BLIND-V1-SEALED / PREREG | evaluator-only 封存，尚未运行模型
 - 类型: FINAL BLIND GENERATION / PRE-REGISTRATION / EVALUATOR-ONLY HANDOFF
 - 生成边界: 在 frozen deployment commit=`2a450d7cf6cb04e54d30cb7fa16ff6bc95316e60` 之后生成；controller commit=`02c54be906c48e1e82ba503a87ca9f7b4d0fa6dc`、grader v2 composite=`9ee96323240d527eb34056313c5a3b183fd2f2c0ceb5719e52d398b52a2cf5bb`、训练数据 digest=`96a5609b8db8ee67dcd1b935be8baca2b4e64b947b80b4fe7d05dfcdd953ac70` 均未修改。pre-run repository HEAD=`57b53f9f685c2222404b812aa5eacde1f272dfd7`。

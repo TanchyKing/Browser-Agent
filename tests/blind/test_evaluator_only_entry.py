@@ -63,6 +63,9 @@ def test_mock_run_path_seals_unscored_output(
     monkeypatch.setattr(evaluator, "FINAL_SCORE_PATH", tmp_path / "score.json")
     monkeypatch.setattr(evaluator, "UNSEAL_RECEIPT_PATH", tmp_path / "unseal.json")
     monkeypatch.setattr(
+        evaluator, "_external_unseal_marker", lambda: tmp_path / "external-unseal.json"
+    )
+    monkeypatch.setattr(
         evaluator, "_assert_public_hashes", lambda: ({}, receipt, prereg)
     )
     monkeypatch.setattr(evaluator, "_assert_frozen_files", lambda _: None)
