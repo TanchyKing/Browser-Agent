@@ -730,3 +730,9 @@
 - 产物封存: run identity=`1755b373...df0e1`；adapter safetensors SHA=`4fb3ffbc...79587`（174655536 bytes）；checkpoint training state SHA=`418c1355...98ed6`；run config=`a0197225...d5d0`；metrics=`1f9b86ba...9757`；log=`6101e296...0427`。checkpoint 与 final adapter 权重一致。
 - 资源事实: CUDA allocator peak allocated/reserved=`13.016/14.007 GB`，物理 8 GB GPU 由 Windows WDDM 分页承载，性能很慢但未改变冻结 device map。400 个训练样本约为 0.823 epoch；本结果严格标记为 `R12-50`，不得冒充原 500-step R12。
 - 验证/边界: 全量 pytest `143 passed, 1 skipped, 14 subtests`。训练 loss 不是任务分数；本条写入时尚未生成、读取或运行 final blind。机器摘要=`artifacts/finetune/r12_50step_training_summary.json`；下一步按冻结部署协议合并、导入并冻结模型 digest，之后才允许 evaluator-only 封存 blind。
+
+## [2026-07-17 11:12] R12-50-DEPLOY-CORRECTION-1 | CPU merge 的 PEFT device-map 参数补全
+- 类型: INFRASTRUCTURE FAILURE / APPEND-ONLY DEPLOYMENT CORRECTION
+- 失败事实: 冻结 base snapshot 的 5 个 shard 离线加载成功，但 `PeftModel.from_pretrained` 未收到 base 已使用的 CPU device map，PEFT 默认重新采用 `auto` 并把后半层推断为 disk offload；因无 offload dir 在 merge 前退出。adapter 未合并，输出目录未创建，blind 未生成/读取。
+- 唯一修复: 将既有 `device_map={"":"cpu"}` 同时显式传给 PEFT adapter loader，禁止其二次自动分派；新增单测断言 base 与 PEFT 两层均为 CPU map。模型 revision、adapter SHA、FP16 merge、Ollama Q4_K_M、controller、grader 与 blind 协议全部不变。
+- 重试 Gate: 修复、测试与机器 correction 先 commit+push，再从不存在的全新输出目录重跑一次 merge。详情=`artifacts/finetune/r12_deployment_correction_1.json`。

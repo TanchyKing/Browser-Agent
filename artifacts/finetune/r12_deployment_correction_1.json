@@ -1,0 +1,28 @@
+{
+  "protocol_version": 1,
+  "status": "frozen_before_merge_retry",
+  "recorded_at": "2026-07-17T11:12:00+08:00",
+  "experiment_id": "R12-50",
+  "failed_attempt": {
+    "stage": "offline_cpu_fp16_merge",
+    "cause": "PeftModel.from_pretrained defaulted to device_map=auto after observing the base CPU hf_device_map, inferred disk offload for later layers, and failed because the frozen merge path had no offload directory.",
+    "base_shards_loaded": true,
+    "adapter_merged": false,
+    "output_directory_created": false,
+    "blind_generated_or_read": false
+  },
+  "authorized_interpretation": "Infrastructure-only deployment correction required to execute the already frozen CPU FP16 merge; it changes no model, adapter, data, training, controller, grader, quantization target, or blind protocol variable.",
+  "single_change": "Pass the existing explicit device_map={\"\":\"cpu\"} to PeftModel.from_pretrained as well as to the base model loader.",
+  "corrected_merge_script_sha256": "cd449704ff96cfd17ea51b598bfdbf84651980f50137f5d23550105ccf919c87",
+  "regression": "144 passed, 1 skipped, 14 subtests passed",
+  "unchanged": {
+    "adapter_model_sha256": "4fb3ffbcc39e5ebe4525e4df86dc85b810e8d7c760895f8cf1b890fec8979587",
+    "base_revision": "b968826d9c46dd6066d109eabc6255188de91218",
+    "merge_dtype": "float16_cpu",
+    "ollama_import": "merged_safetensors_experimental",
+    "ollama_quantization": "q4_K_M",
+    "controller": true,
+    "grader": true,
+    "blind_protocol": true
+  }
+}
