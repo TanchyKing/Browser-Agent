@@ -763,3 +763,10 @@
 - 接口缺口: 同一 smoke 的 base prompt tokens=33，而初始 R12 manifest=23；`ollama show --modelfile` 显示 R12 使用 raw `TEMPLATE {{ .Prompt }}`，没有复用 R10g base 的 Qwen3 generate template。因此尚不能作为同接口权重对照，且未进入 capability/blind。
 - 唯一纠正: 不改变 Q4 blob，仅用本地冻结 `qwen3:8b@500a1f067a9f` 的 Qwen3 template 与 stop/repeat 规则重建最终 Ollama manifest，并保留预注册 R12 的 temperature=0、num_ctx=4096、system。纠正配置=`finetune/Modelfile.r12_50.gguf`；重建后重新冻结 Ollama digest 并再做非任务格式 smoke。
 - 不变量: Q4 GGUF、adapter、模型名、量化、controller、grader 与 blind 协议不变；blind 仍未生成/读取。机器纠正=`artifacts/finetune/r12_deployment_correction_4.json`。
+
+## [2026-07-17 11:33] R12-50-DEPLOY-COMPLETE | Q4_K_M 模型与同接口 manifest 封存
+- 类型: DEPLOYMENT GATE COMPLETE / MODEL DIGEST SEAL / VERIFY
+- 模型封存: F16 GGUF SHA=`4b8392ee...85d3`/16388043648 bytes；Q4_K_M GGUF SHA=`560178fe...e3af8`/5027783552 bytes。Ollama 最终模型=`qwen3:8b-phase2-r12`，digest=`44d1237b...fdc19`，reported size=5027785947 bytes，明确报告 qwen3 8.2B/Q4_K_M 与 completion/tools/thinking。
+- 接口一致性: 最终 R12 generate template SHA 与 frozen base 完全相同，均为 `0b12fdcb...24ef`；R12 仅保留预注册 system、temperature=0、num_ctx=4096，并继承 base stop/repeat。临时 F16 Ollama 名已删除，错误 raw-template manifest 已替换。
+- 非任务 smoke: schema JSON 可解析为 finish，reason=`deployment smoke passed`，done=true、done_reason=stop、截断=0；该 smoke 不对应任何 17-task/final-blind 任务，不计能力分。
+- 验证/边界: 全量 pytest `144 passed, 1 skipped, 14 subtests`。至本条 capability run=0、blind 未生成/读取；部署机器摘要=`artifacts/finetune/r12_50step_deployment_summary.json`。现在满足 evaluator-only final blind 生成前置条件。
