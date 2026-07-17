@@ -723,3 +723,10 @@
 - 启动资源: GPU used/free=340/7463 MiB、温度 49°C，Ollama 无模型驻留；机器接通电源。使用隐藏独立 supervisor 与分离 stdout/stderr/status，Codex 会话中断不终止训练。
 - 命令边界: fresh run，不带 resume；完全离线本地 Qwen3-8B，R10e reviewed dataset，1024 tokens、50 steps、linear horizon=50、lr=2e-4、seed 42、batch 1×accumulation 8、BF16 checkpointing、NF4/LoRA 固定，eval/save=50。输出仅写新目录 `R12_50step_qwen3_8b_qlora`。
 - 停止线: 任意 CPU/disk device map、OOM、非零退出、数据/config identity 不匹配均停止；不自动重启。checkpoint-50 前中断没有 resume 权限。训练完成并冻结 adapter digest 前不生成或读取 final blind。
+
+## [2026-07-17 10:50] R12-50-FORMAL-COMPLETE | 50-step QLoRA 成功并封存 adapter
+- 类型: GPU GATE COMPLETE / VERIFY / ADAPTER SEAL
+- 结果: fresh run 完成 50/50 optimizer steps、最终 validation 与 adapter 保存，exit code=0，未发生 resume、OOM 或 HF CPU/disk device-map offload。supervisor 总耗时 31782.74 s；训练首步/末步 loss=`1.4735513→0.0525972`，final eval loss=`0.0825121`。
+- 产物封存: run identity=`1755b373...df0e1`；adapter safetensors SHA=`4fb3ffbc...79587`（174655536 bytes）；checkpoint training state SHA=`418c1355...98ed6`；run config=`a0197225...d5d0`；metrics=`1f9b86ba...9757`；log=`6101e296...0427`。checkpoint 与 final adapter 权重一致。
+- 资源事实: CUDA allocator peak allocated/reserved=`13.016/14.007 GB`，物理 8 GB GPU 由 Windows WDDM 分页承载，性能很慢但未改变冻结 device map。400 个训练样本约为 0.823 epoch；本结果严格标记为 `R12-50`，不得冒充原 500-step R12。
+- 验证/边界: 全量 pytest `143 passed, 1 skipped, 14 subtests`。训练 loss 不是任务分数；本条写入时尚未生成、读取或运行 final blind。机器摘要=`artifacts/finetune/r12_50step_training_summary.json`；下一步按冻结部署协议合并、导入并冻结模型 digest，之后才允许 evaluator-only 封存 blind。
