@@ -1,0 +1,33 @@
+{
+  "protocol_version": 1,
+  "status": "frozen_before_final_manifest_rebuild",
+  "recorded_at": "2026-07-17T11:31:00+08:00",
+  "experiment_id": "R12-50",
+  "interface_verification": {
+    "base_model": "qwen3:8b@500a1f067a9f",
+    "base_prompt_eval_count": 33,
+    "r12_raw_prompt_eval_count": 23,
+    "same_format_only_prompt": true,
+    "base_response_valid_json": true,
+    "r12_response_valid_json": true,
+    "finding": "The imported GGUF manifest used TEMPLATE {{ .Prompt }} for /api/generate, so the tuned point did not share the frozen Qwen3 generate template with the base point."
+  },
+  "single_correction": "Rebuild only the Ollama manifest from the unchanged Q4_K_M GGUF using the Qwen3 template and stop/repeat rules from the frozen local base model, plus the preregistered R12 temperature, context, and system values.",
+  "corrected_modelfile": "finetune/Modelfile.r12_50.gguf",
+  "corrected_modelfile_sha256": "3afb5614813cf434b8bfbe75739f9efe2d6505ca28f9bb7750ec9580bee0e91e",
+  "regression": "144 passed, 1 skipped, 14 subtests passed",
+  "unchanged": {
+    "q4_k_m_gguf_sha256": "560178fe9de1f29ab8df946de4d6aa9ebccde9ad6aa85555dcc3bb3c044e3af8",
+    "q4_k_m_gguf_bytes": 5027783552,
+    "adapter_model_sha256": "4fb3ffbcc39e5ebe4525e4df86dc85b810e8d7c760895f8cf1b890fec8979587",
+    "final_ollama_model_name": "qwen3:8b-phase2-r12",
+    "final_quantization": "Q4_K_M",
+    "temperature": 0,
+    "num_ctx": 4096,
+    "system_prompt": "You are a browser automation agent. Return one compact grounded JSON action.",
+    "controller": true,
+    "grader": true,
+    "blind_protocol": true
+  },
+  "interpretation": "Interface-parity correction before any capability or blind run; model weights and experiment variables are unchanged."
+}

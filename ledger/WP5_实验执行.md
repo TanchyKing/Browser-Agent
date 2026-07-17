@@ -756,3 +756,10 @@
 - 转换器: official `ggml-org/llama.cpp` shallow clone commit=`e8f19cc0...c8ea2`，worktree clean；`convert_hf_to_gguf.py` SHA=`50642317...8a25`，在隔离 finetune Python 中 help/import 成功。
 - 量化器: Ollama 0.30.10 随附 `llama-quantize.exe` SHA=`7392cc0e...d1d62`，目标 `Q4_K_M`。输入 merged composite 仍为 `ab837580...9e0a7`；预定 F16/Q4 GGUF 路径写入机器摘要。
 - 边界: 错误的 float16 最终模型名已删除；临时 staging 名仍保留。尚未执行 GGUF 转换或能力评测，blind 未生成/读取。机器摘要=`artifacts/finetune/r12_deployment_toolchain.json`。
+
+## [2026-07-17 11:31] R12-50-DEPLOY-CORRECTION-4 | 恢复 base Qwen3 generate template
+- 类型: INTERFACE VERIFICATION FAILURE / APPEND-ONLY DEPLOYMENT CORRECTION
+- 前置成功: F16 GGUF=`16388043648` bytes/SHA `4b8392ee...85d3`；真实 Q4_K_M GGUF=`5027783552` bytes/SHA `560178fe...e3af8`；Ollama 已明确报告 Q4_K_M。非任务格式 smoke 两模型均返回合法 JSON/stop。
+- 接口缺口: 同一 smoke 的 base prompt tokens=33，而初始 R12 manifest=23；`ollama show --modelfile` 显示 R12 使用 raw `TEMPLATE {{ .Prompt }}`，没有复用 R10g base 的 Qwen3 generate template。因此尚不能作为同接口权重对照，且未进入 capability/blind。
+- 唯一纠正: 不改变 Q4 blob，仅用本地冻结 `qwen3:8b@500a1f067a9f` 的 Qwen3 template 与 stop/repeat 规则重建最终 Ollama manifest，并保留预注册 R12 的 temperature=0、num_ctx=4096、system。纠正配置=`finetune/Modelfile.r12_50.gguf`；重建后重新冻结 Ollama digest 并再做非任务格式 smoke。
+- 不变量: Q4 GGUF、adapter、模型名、量化、controller、grader 与 blind 协议不变；blind 仍未生成/读取。机器纠正=`artifacts/finetune/r12_deployment_correction_4.json`。
