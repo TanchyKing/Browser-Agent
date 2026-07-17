@@ -1,0 +1,32 @@
+{
+  "protocol_version": 1,
+  "status": "frozen_before_gguf_conversion",
+  "recorded_at": "2026-07-17T11:22:00+08:00",
+  "experiment_id": "R12-50",
+  "rejected_attempt": {
+    "path": "temporary Ollama F16 safetensors import followed by ollama create --quantize q4_K_M FROM the temporary model",
+    "command_exit_code": 0,
+    "observed_final_size": "16 GB",
+    "observed_quantization": "float16",
+    "reason_rejected": "Ollama reused the safetensors layers and silently ignored quantization for this FROM-model path.",
+    "blind_generated_or_read": false
+  },
+  "corrected_path": [
+    "Clone the official ggml-org/llama.cpp repository shallowly and record the exact resolved commit before conversion.",
+    "Use its convert_hf_to_gguf.py against the exact sealed merged safetensors directory to create one F16 GGUF.",
+    "Use the llama-quantize.exe bundled with Ollama 0.30.10 to create Q4_K_M GGUF.",
+    "Create qwen3:8b-phase2-r12 from the Q4_K_M GGUF and verify Ollama reports quantization Q4_K_M before any capability run."
+  ],
+  "unchanged": {
+    "merged_model_composite_sha256": "ab837580b2b4fbd94627504130bd04c047c7c0d18c15e15a15ff8b5979c9e0a7",
+    "adapter_model_sha256": "4fb3ffbcc39e5ebe4525e4df86dc85b810e8d7c760895f8cf1b890fec8979587",
+    "final_ollama_model_name": "qwen3:8b-phase2-r12",
+    "final_quantization": "q4_K_M",
+    "system_prompt": "You are a browser automation agent. Return one compact grounded JSON action.",
+    "controller": true,
+    "grader": true,
+    "blind_protocol": true
+  },
+  "cleanup_rule": "Remove the incorrectly named float16 final model before the corrected import; retain the staging model until the corrected final model passes metadata and format smoke, then remove only the staging name.",
+  "interpretation": "Infrastructure-only GGUF conversion implementation of the frozen Q4_K_M deployment target; no experiment capability variable changes."
+}

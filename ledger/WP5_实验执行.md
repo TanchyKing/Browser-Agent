@@ -743,3 +743,10 @@
 - 失败事实: Ollama 0.30.10 Windows 对 merged safetensors 执行一步式 `--experimental --quantize q4_K_M` 时，在首层报 `quantization requires MLX support`；MLX 仅适用于 Apple 路径。最终命名模型未创建，blind 未生成/读取。
 - 兼容路径冻结: 先将同一 merged safetensors 以 experimental importer 无量化导入临时 F16 模型，再从该 Ollama F16 模型使用 GGUF quantizer 创建最终 `qwen3:8b-phase2-r12` Q4_K_M；验证 digest/格式 smoke 后仅删除临时模型名。最终权重输入、量化等级、system、controller、grader 与 blind 均不变。
 - 机器纠正: `artifacts/finetune/r12_deployment_correction_2.json`；本条 commit+push 后才执行两段式导入。
+
+## [2026-07-17 11:22] R12-50-DEPLOY-CORRECTION-3 | 显式 GGUF 转换与 Ollama 自带量化器
+- 类型: INFRASTRUCTURE VERIFICATION FAILURE / APPEND-ONLY DEPLOYMENT CORRECTION
+- 验证失败: 两段式命令均 exit 0，但 `ollama show` 显示临时与最终模型均为 8.2B `float16`、16 GB；FROM-model 路径仅复用 safetensors layers，静默忽略 `--quantize q4_K_M`。因此拒绝将其作为最终模型，也未运行能力 smoke/blind。
+- 纠正路径冻结: 从官方 `ggml-org/llama.cpp` shallow clone 并记录 resolved commit；使用其 `convert_hf_to_gguf.py` 将同一 sealed merged safetensors 转为 F16 GGUF，再使用 Ollama 0.30.10 随附的 `llama-quantize.exe` 生成 Q4_K_M GGUF，最后从该 GGUF 创建冻结模型名。能力运行前必须由 `ollama show` 明确验证 quantization=`Q4_K_M`。
+- 清理边界: 先删除错误占用最终名称的 F16 manifest；临时 F16 名保留至正确 Q4 模型完成 metadata/格式 smoke，再仅删除临时名。最终输入权重、模型名、量化级别、system、controller、grader、blind 均不变。
+- 机器纠正: `artifacts/finetune/r12_deployment_correction_3.json`；本条 commit+push 后才下载工具并执行。
