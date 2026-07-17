@@ -1,6 +1,6 @@
 # R10g 与 R12-50 可见评测对比
 
-评测时间：2026-07-17（CST）  
+评测时间：2026-07-17（CST）
 对照条件：R12-50 继承 R10g 的 controller、prompt v2、`visible_testids` observation、schema、thinking、token budget、grader 与 suite；唯一能力变量是模型从基础 `qwen3:8b` 换为 50-step QLoRA 合并后的 `qwen3:8b-phase2-r12`。
 
 ## 结论
@@ -64,4 +64,3 @@ R12-50 没有提升 17 个可见任务的总体完成率：R10g 为 **16/17**，
 2. 不能把失败归因于硬件：所有 generation 都正常 `stop`，无截断、无 transport failure，模型为 100% GPU 驻留。
 3. 不能仅凭本次可见结果改 blind suite；final blind 在 visible 结果产生前已由 evaluator-only 路径独立生成与封存。
 4. R12-50 不应替换 R10g 成为当前默认 agent。后续若继续训练，应先修正数据配比与多步轨迹质量，并保留 R10g 作为回归锚点。
-
