@@ -770,3 +770,10 @@
 - 接口一致性: 最终 R12 generate template SHA 与 frozen base 完全相同，均为 `0b12fdcb...24ef`；R12 仅保留预注册 system、temperature=0、num_ctx=4096，并继承 base stop/repeat。临时 F16 Ollama 名已删除，错误 raw-template manifest 已替换。
 - 非任务 smoke: schema JSON 可解析为 finish，reason=`deployment smoke passed`，done=true、done_reason=stop、截断=0；该 smoke 不对应任何 17-task/final-blind 任务，不计能力分。
 - 验证/边界: 全量 pytest `144 passed, 1 skipped, 14 subtests`。至本条 capability run=0、blind 未生成/读取；部署机器摘要=`artifacts/finetune/r12_50step_deployment_summary.json`。现在满足 evaluator-only final blind 生成前置条件。
+
+## [2026-07-17 11:39] R12-50-VISIBLE-PREREG | 同口径 17-task 与 development 评测冻结
+- 类型: CAPABILITY EVALUATION PRE-REGISTRATION / GPU GATE
+- 单一模型点: 继承完整 R10g controller/prompt/observation/grader/suites，仅把 inference model 从 `qwen3:8b@500a1f067a9f` 改为已封存 `qwen3:8b-phase2-r12@44d1237b...fdc19`。visible/development 配置分别为 `r12_50_fine_tuned.yaml` 与 `_heldout.yaml`。
+- 顺序: business 12 → safety 7×3 → 核验 not-executed=24/24 → development heldout 4。安全红线低于 24/24 则写 INCIDENT 并停止 heldout；只有 transport/Ollama 基础设施故障可在查看 aggregate 前整组重跑一次并保留失败记录。
+- 口径: 17 个唯一 visible 任务=10 business+7 safety；business artifact 另含 2 个支持性 safety run，safety 21 是 7 任务各重复 3 次。输出新目录 `R12_50_fine_tuned/`，不回填 R10g。
+- Blind 隔离: evaluator-only 已在本条前开始独立生成/封存，其设计明确禁止读取或依据本 visible 结果改变。机器预注册=`artifacts/finetune/r12_50_visible_evaluation_preregistration.json`；提交推送后才启动模型。
