@@ -736,3 +736,10 @@
 - 失败事实: 冻结 base snapshot 的 5 个 shard 离线加载成功，但 `PeftModel.from_pretrained` 未收到 base 已使用的 CPU device map，PEFT 默认重新采用 `auto` 并把后半层推断为 disk offload；因无 offload dir 在 merge 前退出。adapter 未合并，输出目录未创建，blind 未生成/读取。
 - 唯一修复: 将既有 `device_map={"":"cpu"}` 同时显式传给 PEFT adapter loader，禁止其二次自动分派；新增单测断言 base 与 PEFT 两层均为 CPU map。模型 revision、adapter SHA、FP16 merge、Ollama Q4_K_M、controller、grader 与 blind 协议全部不变。
 - 重试 Gate: 修复、测试与机器 correction 先 commit+push，再从不存在的全新输出目录重跑一次 merge。详情=`artifacts/finetune/r12_deployment_correction_1.json`。
+
+## [2026-07-17 11:17] R12-50-DEPLOY-CORRECTION-2 | Windows Ollama 两段式 Q4_K_M 导入
+- 类型: INFRASTRUCTURE FAILURE / APPEND-ONLY DEPLOYMENT CORRECTION
+- 前置成功: 修正后的 CPU FP16 merge 在 61.3 s 内成功，5 shard 合并模型组合摘要=`ab837580...9e0a7`，adapter 与 base revision 未变。
+- 失败事实: Ollama 0.30.10 Windows 对 merged safetensors 执行一步式 `--experimental --quantize q4_K_M` 时，在首层报 `quantization requires MLX support`；MLX 仅适用于 Apple 路径。最终命名模型未创建，blind 未生成/读取。
+- 兼容路径冻结: 先将同一 merged safetensors 以 experimental importer 无量化导入临时 F16 模型，再从该 Ollama F16 模型使用 GGUF quantizer 创建最终 `qwen3:8b-phase2-r12` Q4_K_M；验证 digest/格式 smoke 后仅删除临时模型名。最终权重输入、量化等级、system、controller、grader 与 blind 均不变。
+- 机器纠正: `artifacts/finetune/r12_deployment_correction_2.json`；本条 commit+push 后才执行两段式导入。

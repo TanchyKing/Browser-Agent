@@ -1,0 +1,31 @@
+{
+  "protocol_version": 1,
+  "status": "frozen_before_ollama_import_retry",
+  "recorded_at": "2026-07-17T11:17:00+08:00",
+  "experiment_id": "R12-50",
+  "failed_attempt": {
+    "stage": "ollama_experimental_safetensors_direct_q4_K_M_import",
+    "ollama_version": "0.30.10",
+    "platform": "Windows",
+    "error": "failed to create layer for model.layers.0.mlp.down_proj.weight: quantization requires MLX support",
+    "named_target_model_created": false,
+    "blind_generated_or_read": false
+  },
+  "root_cause": "The Windows Ollama experimental safetensors importer cannot perform the requested direct quantization because that path requires Apple MLX support.",
+  "compatibility_path": [
+    "Import the exact sealed merged safetensors directory into a temporary Ollama F16 model without quantization.",
+    "Create the frozen final model from that temporary Ollama model with Ollama's GGUF q4_K_M quantizer.",
+    "Verify final model digest and a format-only smoke, then remove only the temporary model name."
+  ],
+  "unchanged": {
+    "merged_model_composite_sha256": "ab837580b2b4fbd94627504130bd04c047c7c0d18c15e15a15ff8b5979c9e0a7",
+    "adapter_model_sha256": "4fb3ffbcc39e5ebe4525e4df86dc85b810e8d7c760895f8cf1b890fec8979587",
+    "final_ollama_model_name": "qwen3:8b-phase2-r12",
+    "final_quantization": "q4_K_M",
+    "system_prompt": "You are a browser automation agent. Return one compact grounded JSON action.",
+    "controller": true,
+    "grader": true,
+    "blind_protocol": true
+  },
+  "interpretation": "Infrastructure-only two-stage implementation of the frozen safetensors-to-Q4_K_M deployment target; no capability variable changes."
+}
